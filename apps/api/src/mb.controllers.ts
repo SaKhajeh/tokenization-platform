@@ -54,6 +54,8 @@ export class KybController {
           contact_email: z.string().email().max(200).optional(),
         }),
         authority_doc_id: zUuid.optional(),
+        articles_doc_id: zUuid.optional(),
+        gazette_doc_id: zUuid.optional(),
       }),
       body,
     );

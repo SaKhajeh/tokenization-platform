@@ -148,7 +148,10 @@ export async function staff(t: TestApp, mobile: string, ...roles: string[]): Pro
  * Org whose admin is listed as CEO in the (mock) registry, with KYB submitted and approved by a compliance officer.
  * Returns the org plus the reviewer.
  */
-export async function approvedOrg(t: TestApp, n: number, opts: { compliance?: Session; name?: string } = {}) {
+export async function approvedOrg(
+  t: TestApp, n: number,
+  opts: { compliance?: Session; name?: string; financing?: boolean; kybDocs?: boolean; extraPeople?: { nationalCode: string; name: string; roles: string[] }[]; approve?: boolean } = {},
+) {
   const pad = String(n).padStart(4, "0");
   const ncPrefix = `07${pad}111`;
   const legalPrefix = `10${pad}3333`;
@@ -156,15 +159,29 @@ export async function approvedOrg(t: TestApp, n: number, opts: { compliance?: Se
   const { admin, orgId, org } = await orgWithAdmin(t, `0912${pad}777`.slice(0, 11), ncPrefix, legalPrefix, name);
   t.registry.companies.set(legalId(legalPrefix), {
     name, postalCode: "1234567890",
-    people: [{ nationalCode: nationalCode(ncPrefix), name: "مدیر نمونه", position: "مدیرعامل", roles: ["ceo"] }],
+    people: [{ nationalCode: nationalCode(ncPrefix), name: "مدیر نمونه", position: "مدیرعامل", roles: ["ceo"] }, ...(opts.extraPeople ?? []).map((p) => ({ ...p, position: null }))],
   });
+  if (opts.financing) await t.http.put("/api/v1/org/purposes").set(admin.auth).set(org).send({ invest: false, financing: true }).expect(200);
   const reg = await t.http.post("/api/v1/kyb/registry").set(admin.auth).set(org).expect(200);
-  const body = { snapshot_id: reg.body.snapshot.id, fields: KYB_FIELDS };
+  const body: Record<string, unknown> = { snapshot_id: reg.body.snapshot.id, fields: KYB_FIELDS };
+  if (opts.kybDocs) {
+    body.articles_doc_id = await uploadDoc(t, admin, orgId, "kyb_articles");
+    body.gazette_doc_id = await uploadDoc(t, admin, orgId, "kyb_gazette");
+  }
   const su = await stepUp(t, admin, "POST", "/api/v1/kyb/submit", body);
   const sub = await t.http.post("/api/v1/kyb/submit").set(admin.auth).set({ ...org, "x-step-up-token": su }).set(idem()).send(body).expect(201);
   const reviewer = opts.compliance ?? (await staff(t, `0935${pad}000`.slice(0, 11), "compliance_officer"));
-  await t.http.post(`/api/v1/admin/kyb/${sub.body.id}/decision`).set(reviewer.auth).send({ decision: "approve" }).expect(200);
-  return { admin, orgId, org, reviewer, caseId: sub.body.id as string, nationalId: legalId(legalPrefix) };
+  if (opts.approve !== false) await t.http.post(`/api/v1/admin/kyb/${sub.body.id}/decision`).set(reviewer.auth).send({ decision: "approve" }).expect(200);
+  return { admin, orgId, org, reviewer, caseId: sub.body.id as string, nationalId: legalId(legalPrefix), ceoNationalCode: nationalCode(ncPrefix) };
+}
+
+/** Uploads a small PDF for the org and returns its document id. */
+export async function uploadDoc(t: TestApp, s: Session, orgId: string, category = "case_document") {
+  const o = { "x-org-id": orgId };
+  const up = await t.http.post("/api/v1/documents/upload-url").set(s.auth).set(o).set(idem()).send({ category, filename: "f.pdf", mime: "application/pdf", size: 1000 }).expect(201);
+  t.storage.put(`orgs/${orgId}/${up.body.document_id}`, 1000);
+  await t.http.post(`/api/v1/documents/${up.body.document_id}/complete`).set(s.auth).set(o).send({ sha256: "a".repeat(64) }).expect(200);
+  return up.body.document_id as string;
 }
 
 export const KYB_FIELDS = {

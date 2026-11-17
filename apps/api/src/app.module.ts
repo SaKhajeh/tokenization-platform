@@ -44,6 +44,8 @@ import { ApplicationsService } from "./applications/applications.service.js";
 import { PricingService } from "./pricing/pricing.service.js";
 import { InvoicesService } from "./invoices/invoices.service.js";
 import { PricingController, InvoicesController } from "./pricing.controllers.js";
+import { CasesController } from "./cases.controllers.js";
+import { CasesService } from "./cases/cases.service.js";
 
 export interface AppDeps {
   config: AppConfig;
@@ -66,7 +68,7 @@ export class AppModule {
         HealthController, AuthController, OrgsController, TasksController, DocumentsController, AuditController,
         KybController, BankAccountsController, MoneyController, ChainController, StaffTasksController,
         ApplicantsController, ApplicationsController, NotificationsController, JobsController, WithdrawalsController,
-        PricingController, InvoicesController,
+        PricingController, InvoicesController, CasesController,
       ],
       // useFactory, not useValue: Nest serialises useValue providers into the module token,
       // which explodes on large objects such as a PGlite instance.
@@ -100,6 +102,7 @@ export class AppModule {
         WithdrawalsService,
         ApplicationsService,
         PricingService,
+        CasesService,
         InvoicesService,
       ],
     };

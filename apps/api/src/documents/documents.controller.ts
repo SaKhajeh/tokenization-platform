@@ -22,7 +22,7 @@ export class DocumentsController {
   upload(@Req() req: AppRequest, @Body() body: unknown) {
     const b = parse(
       z.object({
-        category: z.enum(["kyb_articles", "kyb_gazette", "kyb_id_card", "authority_letter", "financial_statement", "contract", "evidence", "report", "other"]),
+        category: z.enum(["kyb_articles", "kyb_gazette", "kyb_id_card", "authority_letter", "financial_statement", "contract", "evidence", "report", "case_document", "other"]),
         filename: z.string().trim().min(1).max(200),
         mime: z.string().max(100),
         size: z.number().int().positive(),

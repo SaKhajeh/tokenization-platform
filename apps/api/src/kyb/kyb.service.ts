@@ -26,6 +26,7 @@ import { DepositsService } from "../deposits/deposits.service.js";
 import { closeWorkflowTasks, staffTask } from "../common/workflow.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { withLease } from "../common/lease.js";
+import { CasesService } from "../cases/cases.service.js";
 
 export interface KybFields {
   activity: string;
@@ -70,6 +71,7 @@ export class KybService {
     private readonly chain: ChainService,
     private readonly deposits: DepositsService,
     private readonly notifications: NotificationsService,
+    private readonly cases: CasesService,
   ) {}
 
   private async org(id: string) {
@@ -144,7 +146,7 @@ export class KybService {
     };
   }
 
-  async submit(req: AppRequest, input: { snapshot_id: string; fields: KybFields; authority_doc_id?: string }) {
+  async submit(req: AppRequest, input: { snapshot_id: string; fields: KybFields; authority_doc_id?: string; articles_doc_id?: string; gazette_doc_id?: string }) {
     const nc = await this.myNationalCode(req.user!.id);
     if (!nc) throw kybErr.shahkar();
     const orgId = req.org!.id;
@@ -156,8 +158,9 @@ export class KybService {
 
     const listed = li.people.some((p) => p.nationalCode === nc);
     if (!listed && !input.authority_doc_id) throw kybErr.authorityDoc();
-    if (input.authority_doc_id) {
-      const d = (await this.db.query(`select id from documents where id = $1 and org_id = $2 and status = 'uploaded'`, [input.authority_doc_id, orgId])).rows[0];
+    for (const docId of [input.authority_doc_id, input.articles_doc_id, input.gazette_doc_id]) {
+      if (!docId) continue;
+      const d = (await this.db.query(`select id from documents where id = $1 and org_id = $2 and status = 'uploaded'`, [docId, orgId])).rows[0];
       if (!d) throw kybErr.badDoc();
     }
 
@@ -189,9 +192,10 @@ export class KybService {
       const id = uuidv7();
       const fields = { ...input.fields, postal_code: postal, phone: normalizeDigits(input.fields.phone) };
       await q.query(
-        `insert into kyb_cases (id, org_id, version, status, fields, snapshot_id, risk_flags, bounced_cheques, submitted_by, authority_basis, authority_doc_id)
-         values ($1,$2,$3,'in_review',$4,$5,$6,$7,$8,$9,$10)`,
-        [id, orgId, version, JSON.stringify(fields), snap.id, JSON.stringify(flags), bounced, req.user!.id, listed ? "registry" : "document", input.authority_doc_id ?? null],
+        `insert into kyb_cases (id, org_id, version, status, fields, snapshot_id, risk_flags, bounced_cheques, submitted_by, authority_basis, authority_doc_id, articles_doc_id, gazette_doc_id)
+         values ($1,$2,$3,'in_review',$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [id, orgId, version, JSON.stringify(fields), snap.id, JSON.stringify(flags), bounced, req.user!.id, listed ? "registry" : "document", input.authority_doc_id ?? null,
+          input.articles_doc_id ?? null, input.gazette_doc_id ?? null],
       );
       await q.query(`update orgs set kyb_status = 'in_review', updated_at = now() where id = $1`, [orgId]);
       if (input.authority_doc_id) await q.query(`update org_members set authority_doc_id = $2, updated_at = now() where id = $1`, [req.org!.memberId, input.authority_doc_id]);
@@ -201,6 +205,8 @@ export class KybService {
         linkedType: "kyb_case", linkedId: id, role: "compliance_officer", key: "kyb.review", dueInHours: 48,
         priority: flags.length ? "p0" : "p1",
       });
+      // §2a: an org that wants financing gets its credit case now, pre-filled from this registration
+      await this.cases.openIfEligible(q, orgId, req.user!.id);
       await this.audit.append(q, { ...actor(req), orgId, action: "kyb.submitted", entityType: "kyb_case", entityId: id, after: { version, risk_flags: flags, authority_basis: listed ? "registry" : "document" } });
       return { id, version, status: "in_review", risk_flags: flags, authority_basis: listed ? "registry" : "document" };
     });
@@ -282,6 +288,7 @@ export class KybService {
           await this.chain.syncIdentity(q, c.org_id, "kyb_reapproved");
         }
         approvedOrg = c.org_id;
+        await this.cases.onKybApproved(q, c.org_id);
       } else {
         // A rejection also ends any earlier approval still running; "info requested" leaves it in place.
         await q.query(
