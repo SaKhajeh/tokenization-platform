@@ -89,3 +89,17 @@ describe("financial summary (§5)", () => {
     expect(yearProblems({ ...zero, retainedEarnings: "-20", cash: "-20" })).toEqual([]); // losses allowed
   });
 });
+
+import { addBusinessDays, TICKET } from "../src/index.js";
+describe("tickets (§6c)", () => {
+  it("one business day skips Friday (Tehran time)", () => {
+    // Wednesday 10:00 Tehran → Thursday; Thursday → Saturday
+    expect(addBusinessDays(new Date("2026-11-18T06:30:00Z"), 1).toISOString()).toBe("2026-11-19T06:30:00.000Z");
+    expect(addBusinessDays(new Date("2026-11-19T06:30:00Z"), 1).toISOString()).toBe("2026-11-21T06:30:00.000Z");
+    expect(addBusinessDays(new Date("2026-11-19T06:30:00Z"), 1, new Set(["2026-11-21"])).toISOString()).toBe("2026-11-22T06:30:00.000Z");
+  });
+  it("messages hand the ticket over; a new message reopens a closed one", () => {
+    expect(canTransition(TICKET, "waiting_fund", "waiting_applicant")).toBe(true);
+    expect(canTransition(TICKET, "closed", "waiting_fund")).toBe(true);
+  });
+});

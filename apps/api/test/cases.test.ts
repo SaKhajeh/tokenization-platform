@@ -182,6 +182,7 @@ describe("credit case (plan/07)", () => {
     // applicant: sees the message, a task per item; accepted items are locked; fixes and resubmits
     c = (await t.http.get(`${V}/case`).set(prep.auth).set(o).expect(200)).body;
     expect(c.items.find((x: any) => x.id === trialItem.id).review).toMatchObject({ decision: "needs_fix", message: "تراز آزمایشی مهر شرکت ندارد." });
+    expect(c.items.find((x: any) => x.id === trialItem.id).comments.map((x: any) => [x.type, x.body, x.file_version])).toEqual([["to_applicant", "تراز آزمایشی مهر شرکت ندارد.", 2]]);
     const tasks = await t.db.query(`select title from tasks where org_id = $1 and workflow_key = 'case.fix_item' and status = 'open'`, [a.orgId]);
     expect(tasks.rows).toHaveLength(2);
     const accepted = c.items.find((x: any) => x.state === "accepted" && !x.from_kyb);

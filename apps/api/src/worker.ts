@@ -4,6 +4,7 @@
  *   cobank.deposits.poll    every 120 s — Jibit "waiting for verify" deposits → accept / hold / refund
  *   cobank.settlements.poll every 120 s — track sent withdrawals at Jibit → completed / failed / reverted
  *   notifications.sms       every 30 s  — deliver queued SMS
+ *   tickets.escalate        every 600 s — overdue tickets (waiting for the fund) → fund manager
  *   kyb.expiry              hourly      — reminders 30/7 days ahead, expiry + on-chain revoke
  *   applications.expiry     hourly      — drafts/returned applications inactive for 60 days
  * Each job holds a DB lease, so running two workers is safe (the second one skips).
@@ -23,6 +24,7 @@ import { NotificationsService } from "./notifications/notifications.service.js";
 import { KybService } from "./kyb/kyb.service.js";
 import { ApplicationsService } from "./applications/applications.service.js";
 import { WithdrawalsService } from "./withdrawals/withdrawals.service.js";
+import { TicketsService } from "./tickets/tickets.service.js";
 
 const log = new Logger("worker");
 
@@ -37,6 +39,7 @@ async function main() {
   const kyb = ctx.get(KybService);
   const apps = ctx.get(ApplicationsService);
   const withdrawals = ctx.get(WithdrawalsService);
+  const tickets = ctx.get(TicketsService);
 
   let stopping = false;
   const every = (name: string, ms: number, fn: () => Promise<unknown>) => {
@@ -60,6 +63,7 @@ async function main() {
   every("notifications.sms", 30_000, () => withLease(db, "notifications.sms", 120, () => notifications.sendQueuedSms()));
   every("kyb.expiry", 3_600_000, () => kyb.runExpiry());
   every("applications.expiry", 3_600_000, () => withLease(db, "applications.expiry", 600, () => apps.expireInactive()));
+  every("tickets.escalate", 600_000, () => tickets.escalateOverdue());
 
   const stop = async () => {
     stopping = true;

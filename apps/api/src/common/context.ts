@@ -8,6 +8,7 @@ export type StaffRole =
   | "tokenisation_officer"
   | "analyst"
   | "external_expert"
+  | "technical_expert"
   | "committee_member"
   | "fund_manager"
   | "auditor";

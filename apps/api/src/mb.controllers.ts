@@ -14,7 +14,7 @@ import { ChainService } from "./chain/chain.service.js";
 import { DB, Db } from "./db/db.js";
 
 const ALL_STAFF: StaffRole[] = [
-  "super_admin", "compliance_officer", "finance_officer", "tokenisation_officer", "analyst", "external_expert", "committee_member", "fund_manager", "auditor",
+  "super_admin", "compliance_officer", "finance_officer", "tokenisation_officer", "analyst", "external_expert", "technical_expert", "committee_member", "fund_manager", "auditor",
 ];
 const zId = z.object({ id: zUuid });
 

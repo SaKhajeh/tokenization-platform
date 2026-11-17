@@ -1,13 +1,14 @@
 /** HTTP endpoints for the credit case (plan/07 §2–§6). One case per organisation: the applicant side uses /case. */
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from "@nestjs/common";
 import { z } from "zod";
-import { FINANCIAL_FIELDS, FORM_SECTIONS, REVIEW_REASONS, STATEMENT_TYPES } from "@tp/domain";
+import { COMMENT_TARGETS, FINANCIAL_FIELDS, FORM_SECTIONS, NOTE_RECIPIENT_ROLES, REVIEW_REASONS, STATEMENT_TYPES } from "@tp/domain";
 import { OrgRoute, Req, StaffOnly } from "./common/guards.js";
 import { StepUp } from "./common/stepup.js";
 import { Idempotent } from "./common/idempotency.js";
 import type { AppRequest } from "./common/context.js";
 import { parse, zUuid } from "./common/zod.js";
 import { CasesService } from "./cases/cases.service.js";
+import { CommentsService } from "./cases/comments.service.js";
 
 const zId = z.object({ id: zUuid });
 const zItem = z.object({ itemId: zUuid });
@@ -18,7 +19,7 @@ const zSectionData = z.record(z.unknown()).refine((d) => JSON.stringify(d).lengt
 
 @Controller()
 export class CasesController {
-  constructor(private readonly cases: CasesService) {}
+  constructor(private readonly cases: CasesService, private readonly comments: CommentsService) {}
 
   // ------------------------------------------------------------------ applicant
 
@@ -112,16 +113,49 @@ export class CasesController {
     return this.cases.withdraw(req, parse(z.object({ reason: zText(3, 1000) }), body).reason);
   }
 
+  /** The applicant replies in a thread (an item, a form section, a figure, or the case). */
+  @Post("case/comments")
+  @OrgRoute("org_admin", "preparer", "approver")
+  reply(@Req() req: AppRequest, @Body() body: unknown) {
+    return this.comments.applicantReply(req, parse(zComment, body));
+  }
+
   // ------------------------------------------------------------------ fund
 
+  /** Message to the applicant, or an internal note with recipients (roles or named staff). */
+  @Post("admin/cases/:id/comments")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer")
+  comment(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(zComment.extend({
+      type: z.enum(["to_applicant", "internal"]),
+      recipients: z.array(z.union([z.object({ role: z.enum(NOTE_RECIPIENT_ROLES) }), z.object({ userId: zUuid })])).max(10).optional(),
+    }), body);
+    return this.comments.staffComment(req, parse(zId, p).id, b as any);
+  }
+
+  /** «یادداشت‌های داخلی برای شما». */
+  @Get("admin/notes")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "super_admin")
+  notes(@Req() req: AppRequest) {
+    return this.comments.myNotes(req);
+  }
+
+  /** §6a: open a case file in the viewer, or download it — both logged. */
+  @Get("admin/cases/:id/files/:fileId/:action")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor")
+  openFile(@Req() req: AppRequest, @Param() p: unknown) {
+    const { id, fileId, action } = parse(z.object({ id: zUuid, fileId: zUuid, action: z.enum(["view", "download"]) }), p);
+    return this.cases.openFile(req, id, fileId, action);
+  }
+
   @Get("admin/cases")
-  @StaffOnly("analyst", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   list(@Query() query: unknown) {
     return this.cases.list(parse(z.object({ state: z.string().max(40).optional() }), query).state);
   }
 
   @Get("admin/cases/:id")
-  @StaffOnly("analyst", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   get(@Param() p: unknown) {
     return this.cases.get(parse(zId, p).id);
   }
@@ -184,6 +218,13 @@ export class CasesController {
     return this.cases.lockFinancials(req, parse(zId, p).id);
   }
 }
+
+const zComment = z.object({
+  target_type: z.enum(COMMENT_TARGETS),
+  target_id: z.string().min(1).max(80),
+  body: z.string().trim().min(1).max(5000),
+  file_version: z.number().int().positive().nullable().optional(),
+});
 
 const zReview = z.object({
   decision: z.enum(["accept", "needs_fix", "reject"]),

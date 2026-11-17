@@ -1,5 +1,6 @@
 /** HTTP endpoints for milestone M-C (part 1): applicant onboarding, initiatives + applications, notifications, jobs. */
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
+import { TicketsService } from "./tickets/tickets.service.js";
 import { z } from "zod";
 import { OrgRoute, Req, StaffOnly } from "./common/guards.js";
 import { StepUp } from "./common/stepup.js";
@@ -239,15 +240,16 @@ export class NotificationsController {
 
 @Controller()
 export class JobsController {
-  constructor(private readonly kyb: KybService, private readonly apps: ApplicationsService, private readonly n: NotificationsService) {}
+  constructor(private readonly kyb: KybService, private readonly apps: ApplicationsService, private readonly n: NotificationsService, private readonly tickets: TicketsService) {}
 
   @Post("admin/jobs/:name/run")
   @HttpCode(200)
   @StaffOnly("super_admin")
   run(@Param() p: unknown) {
-    const { name } = parse(z.object({ name: z.enum(["kyb-expiry", "application-expiry", "sms"]) }), p);
+    const { name } = parse(z.object({ name: z.enum(["kyb-expiry", "application-expiry", "sms", "ticket-escalation"]) }), p);
     if (name === "kyb-expiry") return this.kyb.runExpiry();
     if (name === "application-expiry") return this.apps.expireInactive();
+    if (name === "ticket-escalation") return this.tickets.escalateOverdue();
     return this.n.sendQueuedSms();
   }
 }

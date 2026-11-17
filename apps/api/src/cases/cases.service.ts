@@ -24,6 +24,10 @@ import { uuidv7 } from "../common/ids.js";
 import { closeWorkflowTasks, staffTask } from "../common/workflow.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { tehranToday } from "../applications/applications.service.js";
+import { CommentsService } from "./comments.service.js";
+import { CONFIG } from "../common/tokens.js";
+import type { AppConfig } from "../config.js";
+import { ObjectStorage, STORAGE } from "../integrations/providers.js";
 
 const err = {
   noCase: () => new ApiError(404, "NO_CASE", "This organisation has no credit case; choose financing first", "این سازمان پرونده‌ی اعتباری ندارد؛ ابتدا درخواست تأمین مالی را انتخاب کنید."),
@@ -55,6 +59,9 @@ export class CasesService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly comments: CommentsService,
+    @Inject(STORAGE) private readonly storage: ObjectStorage,
+    @Inject(CONFIG) private readonly cfg: AppConfig,
   ) {}
 
   // ================================================================== opening and pre-fill (§2a)
@@ -268,6 +275,8 @@ export class CasesService {
       const r = reviews.filter((x: any) => x.target_type === type && x.target_id === id).pop();
       return r ? { decision: r.decision, reason_code: r.reason_code, message: r.message, at: r.at, ...(staff ? { reviewer_id: r.reviewer_id, file_versions: r.file_versions } : {}) } : null;
     };
+    const comments = await this.comments.forCase(q, c.id, staff);
+    const thread = (type: string, id: string) => comments.filter((x) => x.target_type === type && x.target_id === id);
     const fin = (await q.query(`select * from case_financials where case_id = $1 order by fiscal_year desc`, [c.id])).rows;
     const adjustments = staff ? (await q.query(`select * from financial_adjustments where case_id = $1 order by at`, [c.id])).rows : [];
     return {
@@ -282,7 +291,7 @@ export class CasesService {
         return {
           section: s, title: FORM_SECTION_TITLES[s], state: r.state, data: r.data, prefill: r.prefill,
           changed_from_registration: changedKeys(r.prefill, r.data), problems: sectionProblems(s, r.data, all),
-          review: lastReview("section", s), ...(s === "banks_facilities" ? { totals: bankTotals(r.data) } : {}),
+          review: lastReview("section", s), comments: thread("section", s), ...(s === "banks_facilities" ? { totals: bankTotals(r.data) } : {}),
         };
       }),
       items: items.filter((i: any) => staff || i.state !== "not_required").map((i: any) => {
@@ -296,6 +305,7 @@ export class CasesService {
             link_url: f.link_url, uploaded_at: f.uploaded_at, ...(staff ? { uploaded_by: f.uploaded_by, removed_at: f.removed_at } : {}),
           })),
           review: lastReview("item", i.id),
+          comments: thread("item", i.id),
         };
       }),
       financials: yearsOf(c.latest_fiscal_year).map((y) => {
@@ -307,6 +317,8 @@ export class CasesService {
           ...(staff ? { verified: r?.verified ?? null, verified_totals: r?.verified && !figureProblems(r.verified).length ? statementTotals(r.verified) : null, adjustments: adjustments.filter((a: any) => a.fiscal_year === y) } : {}),
         };
       }),
+      case_comments: thread("case", c.id),
+      figure_comments: comments.filter((x) => x.target_type === "fin_cell"),
       blockers: editable(c.state) ? await this.blockers(q, c) : [],
     };
   }
@@ -531,7 +543,28 @@ export class CasesService {
     const v = await this.view(this.db, c, true);
     const events = (await this.db.query(`select from_state, to_state, actor_id, note, at from case_events where case_id = $1 order by at`, [id])).rows;
     const reviews = (await this.db.query(`select * from case_reviews where case_id = $1 order by at`, [id])).rows;
-    return { ...v, events, reviews };
+    const access = (await this.db.query(
+      `select l.document_id, l.user_id, u.full_name, l.action, l.at, i.code, i.label, f.version
+       from document_access_log l join case_item_files f on f.document_id = l.document_id join case_items i on i.id = f.item_id
+       join users u on u.id = l.user_id where i.case_id = $1 order by l.at desc limit 500`,
+      [id],
+    )).rows;
+    return { ...v, events, reviews, access_history: access };
+  }
+
+  /** §6a: staff open a case file in the viewer or download it; both are logged and listed in the case's access history. */
+  async openFile(req: AppRequest, caseId: string, fileId: string, action: "view" | "download") {
+    const f = (await this.db.query(
+      `select f.*, d.storage_key, d.filename, d.status from case_item_files f join case_items i on i.id = f.item_id join documents d on d.id = f.document_id
+       where f.id = $1 and i.case_id = $2`,
+      [fileId, caseId],
+    )).rows[0];
+    if (!f || f.status !== "uploaded") throw Errors.notFound("File");
+    await this.db.query(`insert into document_access_log (id, document_id, user_id, org_id, action, ip) values ($1,$2,$3,null,$4,$5)`, [
+      uuidv7(), f.document_id, req.user!.id, action, req.ip ?? null,
+    ]);
+    const ttl = this.cfg.documentUrlTtlSec;
+    return { url: await this.storage.presignGet(f.storage_key, f.filename, ttl), expires_in: ttl, action, version: f.version };
   }
 
   async startReview(req: AppRequest, id: string) {
@@ -580,6 +613,11 @@ export class CasesService {
         `insert into case_reviews (id, case_id, target_type, target_id, decision, reason_code, message, file_versions, reviewer_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [uuidv7(), id, target.type, target.id, input.decision, input.reason_code ?? null, input.message?.trim() || null, versions, req.user!.id],
       );
+      if (input.decision !== "accept") {
+        await this.comments.insert(q, c, {
+          target_type: target.type, target_id: target.id, type: "to_applicant", author: req.user!.id, body: input.message!, file_version: versions.at(-1) ?? null,
+        });
+      }
       await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: "case.reviewed", entityType: target.type === "item" ? "case_item" : "case", entityId: target.type === "item" ? target.id : id, after: { ...input, target } });
       return { target, state: row.state };
     });

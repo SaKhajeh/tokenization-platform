@@ -65,6 +65,12 @@ export const TEMPLATES = {
     title: "به‌روزرسانی اطلاعات سازمان", link: () => "/org",
     body: (p) => `در پرونده‌ی ${p.no} اطلاعات هویتی کلیدی (نام، نوع شرکت یا صاحبان امضا) تغییر کرد؛ لطفاً پروفایل سازمان را هم به‌روز کنید تا احراز هویت دوباره انجام شود.`,
   },
+  "case.message": { title: "پیام کارشناس صندوق", link: () => "/case", body: (p) => `پیام تازه درباره‌ی «${p.target}» در پرونده‌ی ${p.no}.` },
+  "case.internal_note": { title: "یادداشت داخلی برای شما", link: (p) => `/admin/cases/${p.case_id}`, body: (p) => `یادداشت داخلی درباره‌ی «${p.target}» در پرونده‌ی ${p.no}.` },
+  "case.applicant_reply": { title: "پاسخ متقاضی", link: (p) => `/admin/cases/${p.case_id}`, body: (p) => `متقاضی درباره‌ی «${p.target}» در پرونده‌ی ${p.no} پاسخ داد.` },
+  "ticket.message": { title: "پیام تازه در تیکت", sms: true, link: (p) => `/tickets/${p.id}`, body: (p) => `تیکت ${p.no} («${p.subject}»): پیام تازه دارید.` },
+  "ticket.staff_message": { title: "پیام تازه در تیکت", link: (p) => `/admin/tickets/${p.id}`, body: (p) => `تیکت ${p.no} («${p.subject}») منتظر پاسخ صندوق است.` },
+  "ticket.escalated": { title: "تیکت بی‌پاسخ", link: (p) => `/admin/tickets/${p.id}`, body: (p) => `تیکت ${p.no} («${p.subject}») از زمان هدف پاسخ گذشته است.` },
   "invoice.paid": { title: "صورت‌حساب پرداخت شد", body: (p) => `صورت‌حساب ${p.no} به مبلغ ${p.amount} پرداخت شد.`, link: (p) => `/invoices/${p.id}` },
   "application.expired": { title: "درخواست منقضی شد", body: (p) => `درخواست ${p.no} به دلیل عدم فعالیت منقضی شد.`, link: (p) => `/applications/${p.id}` },
 } satisfies Record<string, Tpl>;
