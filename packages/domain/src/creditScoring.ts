@@ -68,6 +68,8 @@ export type ActivityType =
   | "services_contracting"    // خدماتی - پیمانکاری
   | "trading_contracting";    // بازرگانی - پیمانکاری
 
+export const ACTIVITY_TYPES = ["production_contracting", "production_line", "production_trading", "services_contracting", "trading_contracting"] as const satisfies readonly ActivityType[];
+
 export type CollateralClass = "cheque" | "mortgage_2" | "mortgage_1";
 export const COLLATERAL_CLASSES: readonly CollateralClass[] = ["cheque", "mortgage_2", "mortgage_1"];
 

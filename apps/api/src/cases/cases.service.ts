@@ -25,6 +25,7 @@ import { closeWorkflowTasks, staffTask } from "../common/workflow.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { tehranToday } from "../applications/applications.service.js";
 import { CommentsService } from "./comments.service.js";
+import { assessmentFee } from "./fees.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { ObjectStorage, STORAGE } from "../integrations/providers.js";
@@ -150,26 +151,26 @@ export class CasesService {
 
   // ================================================================== loading and views
 
-  private async caseOf(q: Queryable, orgId: string, lock = false) {
+  async caseOf(q: Queryable, orgId: string, lock = false) {
     const c = (await q.query(`select * from cases where org_id = $1 ${lock ? "for update" : ""}`, [orgId])).rows[0];
     if (!c) throw err.noCase();
     return c;
   }
 
-  private async caseById(q: Queryable, id: string, lock = false) {
+  async caseById(q: Queryable, id: string, lock = false) {
     const c = (await q.query(`select * from cases where id = $1 ${lock ? "for update" : ""}`, [id])).rows[0];
     if (!c) throw Errors.notFound("Case");
     return c;
   }
 
-  private async move(q: Queryable, c: any, to: CaseState, actorId: string | null, note?: string) {
+  async move(q: Queryable, c: any, to: CaseState, actorId: string | null, note?: string) {
     transition("case", CASE, c.state as CaseState, to);
     await q.query(`update cases set state = $2, updated_at = now(), last_activity_at = now() where id = $1`, [c.id, to]);
     await q.query(`insert into case_events (id, case_id, from_state, to_state, actor_id, note) values ($1,$2,$3,$4,$5,$6)`, [uuidv7(), c.id, c.state, to, actorId, note ?? null]);
     c.state = to;
   }
 
-  private async moveItem(q: Queryable, table: "case_items" | "case_sections", row: any, to: ItemState) {
+  async moveItem(q: Queryable, table: "case_items" | "case_sections", row: any, to: ItemState) {
     if (row.state === to) return;
     transition("case_item", CASE_ITEM, row.state as ItemState, to);
     if (table === "case_items") await q.query(`update case_items set state = $2, updated_at = now() where id = $1`, [row.id, to]);
@@ -224,7 +225,7 @@ export class CasesService {
     }
   }
 
-  private async sections(q: Queryable, caseId: string) {
+  async sections(q: Queryable, caseId: string) {
     const rows = (await q.query(`select * from case_sections where case_id = $1`, [caseId])).rows;
     return Object.fromEntries(rows.map((r: any) => [r.section, r])) as Record<FormSection, any>;
   }
@@ -243,6 +244,11 @@ export class CasesService {
       return out;
     }
     if (!c.letter_signed_at) out.push({ code: c.request_letter ? "letter_not_signed" : "letter_missing" });
+    // D-C13: the assessment fee is paid at submission
+    const fee = await assessmentFee(q, c.id);
+    if (fee.amount > 0n && !(fee.invoice && ["paid", "waived"].includes(fee.invoice.status))) {
+      out.push({ code: "assessment_fee_unpaid", amount: fee.amount.toString(), region: fee.region, invoice_id: fee.invoice?.id ?? null });
+    }
     for (const s of FORM_SECTIONS) {
       const p = sectionProblems(s, secs[s].data, all);
       if (secs[s].state === "empty") out.push({ code: "section_not_saved", section: s });
@@ -505,7 +511,6 @@ export class CasesService {
         title: `${resubmit ? "بررسی اصلاحات" : "بررسی"} پرونده‌ی اعتباری ${c.case_no} — ${org.legal_name}`,
         linkedType: "case", linkedId: c.id, role: "analyst", key: "case.review", dueInHours: 72,
       });
-      // TODO(part 4, D-C13): issue the assessment-fee invoice here from the fund's tariff.
       await this.notifications.notify(q, { to: { orgId: c.org_id }, event: "case.submitted", params: { no: c.case_no } });
       await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: resubmit ? "case.resubmitted" : "case.submitted", entityType: "case", entityId: c.id, after: { items: items.length, sections: secs.length } });
       return { id: c.id, state: c.state };

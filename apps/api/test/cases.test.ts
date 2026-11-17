@@ -33,8 +33,8 @@ function sectionData(ceo: string) {
   return {
     knowledge_based: { is_knowledge_based: true, type: "فناور", approval_date: "2025-05-01", validity_date: "2027-05-01", products: "حسگر صنعتی", field: "electronics" },
     locations: { rows: [
-      { id: "L1", usage: "head_office", area_m2: 120, staff_count: 8, ownership: "leased", address: "تهران، خیابان آزمایش", postcode: "1234567890" },
-      { usage: "factory", area_m2: 900, staff_count: 30, ownership: "owned", address: "شهرک صنعتی پرند", postcode: "3761234567" },
+      { id: "L1", usage: "head_office", area_m2: 120, staff_count: 8, ownership: "leased", province: "تهران", address: "تهران، خیابان آزمایش", postcode: "1234567890" },
+      { usage: "factory", area_m2: 900, staff_count: 30, ownership: "owned", province: "تهران", address: "شهرک صنعتی پرند", postcode: "3761234567" },
     ] },
     board: { gazette_no: "23456", gazette_date: "2026-02-10", people: [
       { national_id: ceo, name: "مدیر نمونه", kind: "person", roles: ["ceo", "board", "shareholder"], share_pct: 70, signing_right: true },

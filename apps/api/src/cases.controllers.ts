@@ -1,7 +1,7 @@
 /** HTTP endpoints for the credit case (plan/07 §2–§6). One case per organisation: the applicant side uses /case. */
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from "@nestjs/common";
 import { z } from "zod";
-import { COMMENT_TARGETS, FINANCIAL_FIELDS, FORM_SECTIONS, NOTE_RECIPIENT_ROLES, REVIEW_REASONS, STATEMENT_TYPES } from "@tp/domain";
+import { ACTIVITY_TYPES, COMMENT_TARGETS, FINANCIAL_FIELDS, FORM_SECTIONS, NOTE_RECIPIENT_ROLES, REVIEW_REASONS, STATEMENT_TYPES } from "@tp/domain";
 import { OrgRoute, Req, StaffOnly } from "./common/guards.js";
 import { StepUp } from "./common/stepup.js";
 import { Idempotent } from "./common/idempotency.js";
@@ -9,6 +9,8 @@ import type { AppRequest } from "./common/context.js";
 import { parse, zUuid } from "./common/zod.js";
 import { CasesService } from "./cases/cases.service.js";
 import { CommentsService } from "./cases/comments.service.js";
+import { LimitsService } from "./cases/limits.service.js";
+import { zIsoDate } from "./common/zod.js";
 
 const zId = z.object({ id: zUuid });
 const zItem = z.object({ itemId: zUuid });
@@ -19,7 +21,7 @@ const zSectionData = z.record(z.unknown()).refine((d) => JSON.stringify(d).lengt
 
 @Controller()
 export class CasesController {
-  constructor(private readonly cases: CasesService, private readonly comments: CommentsService) {}
+  constructor(private readonly cases: CasesService, private readonly comments: CommentsService, private readonly limits: LimitsService) {}
 
   // ------------------------------------------------------------------ applicant
 
@@ -120,6 +122,87 @@ export class CasesController {
     return this.comments.applicantReply(req, parse(zComment, body));
   }
 
+  /** D-C13: issue (or return) the assessment-fee invoice; it is paid through /invoices/:id/pay. */
+  @Post("case/fee")
+  @HttpCode(200)
+  @OrgRoute("org_admin", "preparer", "approver")
+  fee(@Req() req: AppRequest) {
+    return this.limits.feeInvoice(req);
+  }
+
+  @Get("case/visit")
+  @OrgRoute()
+  visit(@Req() req: AppRequest) {
+    return this.limits.myVisit(req);
+  }
+
+  @Post("case/visit/confirm")
+  @HttpCode(200)
+  @OrgRoute("org_admin", "preparer", "approver")
+  confirmVisit(@Req() req: AppRequest) {
+    return this.limits.confirmVisit(req);
+  }
+
+  @Post("case/visit/change-request")
+  @HttpCode(200)
+  @OrgRoute("org_admin", "preparer", "approver")
+  changeVisit(@Req() req: AppRequest, @Body() body: unknown) {
+    return this.limits.requestOtherDate(req, parse(z.object({ message: zText(3, 2000) }), body).message);
+  }
+
+  /** A-74: credit limit, validity, usage and the fund's note. */
+  @Get("case/limit")
+  @OrgRoute()
+  myLimit(@Req() req: AppRequest) {
+    return this.limits.myLimit(req);
+  }
+
+  // ------------------------------------------------------------------ fund: configuration
+
+  @Get("admin/tariffs")
+  @StaffOnly("fund_manager", "analyst", "finance_officer", "auditor", "super_admin")
+  tariffs() {
+    return this.limits.tariff();
+  }
+
+  @Put("admin/tariffs")
+  @StaffOnly("fund_manager")
+  @StepUp()
+  setTariff(@Req() req: AppRequest, @Body() body: unknown) {
+    const rial = z.string().regex(/^(0|[1-9]\d{0,17})$/);
+    const bps = z.number().int().min(0).max(10000);
+    return this.limits.setTariff(req, parse(z.object({
+      effective_from: zIsoDate, assessment_fee_tehran: rial, assessment_fee_outside: rial, application_fee: rial,
+      servicing_fee_bps: bps, investor_fee_bps: bps, platform_share_bps: bps, note: z.string().max(1000).nullable().optional(),
+    }), body));
+  }
+
+  @Get("admin/scoring-method")
+  @StaffOnly("fund_manager", "analyst", "auditor", "super_admin")
+  method() {
+    return this.limits.method();
+  }
+
+  @Put("admin/scoring-method")
+  @StaffOnly("fund_manager")
+  @StepUp()
+  setMethod(@Req() req: AppRequest, @Body() body: unknown) {
+    const unit = z.number().min(0).max(1);
+    const bands = z.tuple([z.number(), z.number(), z.number(), z.number()]);
+    const b = parse(z.object({
+      beta: z.record(z.enum(ACTIVITY_TYPES), z.object({ guarantee: z.number().min(0).max(100), facility: z.number().min(0).max(100) })),
+      matrix: z.array(z.array(unit).length(5)).length(5),
+      growthBands: bands, marginBands: bands, c1Bands: bands, c2Bands: bands,
+      collateral: z.object({ cheque: z.number().positive().max(2), mortgage_2: z.number().positive().max(2), mortgage_1: z.number().positive().max(2) }),
+      marginWeights: z.tuple([unit, unit, unit]),
+      crl: z.object({ a: z.number(), b: z.number() }),
+      taxRate: unit,
+      limitCollateral: z.enum(["cheque", "mortgage_2", "mortgage_1"]),
+      note: z.string().max(1000).optional(),
+    }).strict(), body);
+    return this.limits.setMethod(req, b as any);
+  }
+
   // ------------------------------------------------------------------ fund
 
   /** Message to the applicant, or an internal note with recipients (roles or named staff). */
@@ -217,7 +300,92 @@ export class CasesController {
   lock(@Req() req: AppRequest, @Param() p: unknown) {
     return this.cases.lockFinancials(req, parse(zId, p).id);
   }
+
+  // ------------------------------------------------------------------ fund: visit, scoring, approval, limit
+
+  @Post("admin/cases/:id/visit")
+  @StaffOnly("analyst")
+  proposeVisit(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.limits.proposeVisit(req, parse(zId, p).id, parse(z.object({ visit_date: zIsoDate, visit_time: z.string().regex(/^[0-2][0-9]:[0-5][0-9]$/), visitor_id: zUuid }), body));
+  }
+
+  @Post("admin/cases/:id/visit/report")
+  @HttpCode(200)
+  @StaffOnly("analyst", "technical_expert")
+  reportVisit(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.limits.reportVisit(req, parse(zId, p).id, parse(z.object({ findings: zText(10, 10000), photo_doc_ids: z.array(zUuid).max(30).optional() }), body));
+  }
+
+  @Post("admin/cases/:id/items/:itemId/original-received")
+  @HttpCode(200)
+  @StaffOnly("analyst", "technical_expert")
+  original(@Req() req: AppRequest, @Param() p: unknown) {
+    const { id, itemId } = parse(z.object({ id: zUuid, itemId: zUuid }), p);
+    return this.limits.originalReceived(req, id, itemId);
+  }
+
+  /** S-19: run the method with Rc, Ra, Re and a reason for each (D-C4). */
+  @Post("admin/cases/:id/scoring")
+  @HttpCode(200)
+  @StaffOnly("analyst")
+  score(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(z.object({
+      activity_type: z.enum(ACTIVITY_TYPES), guarantee: zJ,
+      reasons: z.object({ rc: zText(5, 2000), ra: zText(5, 2000), re: zText(5, 2000) }),
+      facility: zJ.nullable().optional(),
+    }), body);
+    return this.limits.score(req, parse(zId, p).id, b);
+  }
+
+  @Post("admin/cases/:id/scoring/submit")
+  @HttpCode(200)
+  @StaffOnly("analyst")
+  sendForApproval(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.limits.sendForApproval(req, parse(zId, p).id, parse(z.object({ summary: zText(10, 5000) }), body).summary);
+  }
+
+  @Get("admin/cases/:id/rounds")
+  @StaffOnly("analyst", "fund_manager", "auditor", "super_admin")
+  rounds(@Param() p: unknown) {
+    return this.limits.rounds(parse(zId, p).id);
+  }
+
+  @Post("admin/cases/:id/decision")
+  @HttpCode(200)
+  @StaffOnly("fund_manager")
+  @StepUp()
+  decide(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(z.object({
+      decision: z.enum(["approve", "send_back", "decline"]), reason: z.string().trim().max(3000).optional(), note_to_applicant: z.string().trim().max(3000).optional(),
+    }).refine((x) => x.decision === "approve" || (x.reason && x.reason.length >= 5), "a reason is required to send back or decline"), body);
+    return this.limits.decide(req, parse(zId, p).id, b);
+  }
+
+  @Get("admin/orgs/:id/credit-limit")
+  @StaffOnly("analyst", "fund_manager", "finance_officer", "auditor", "super_admin")
+  staffLimit(@Param() p: unknown) {
+    return this.limits.staffLimit(parse(zId, p).id);
+  }
+
+  @Post("admin/orgs/:id/limit-usages")
+  @StaffOnly("analyst")
+  addUsage(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(z.object({
+      source_type: z.enum(["existing_guarantee", "existing_facility"]), description: zText(3, 500),
+      amount: z.string().regex(/^[1-9]\d{0,17}$/), ra: z.number().gt(0).max(1), re: z.number().gt(0).max(1),
+    }), body);
+    return this.limits.addUsage(req, parse(zId, p).id, b);
+  }
+
+  @Post("admin/limit-usages/:id/release")
+  @HttpCode(200)
+  @StaffOnly("analyst", "fund_manager")
+  release(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.limits.releaseUsage(req, parse(zId, p).id, parse(z.object({ reason: zText(3, 500) }), body).reason);
+  }
 }
+
+const zJ = z.object({ rc: z.number().min(0).max(1), ra: z.number().min(0).max(1), re: z.number().min(0).max(1) });
 
 const zComment = z.object({
   target_type: z.enum(COMMENT_TARGETS),

@@ -71,6 +71,17 @@ export const TEMPLATES = {
   "ticket.message": { title: "پیام تازه در تیکت", sms: true, link: (p) => `/tickets/${p.id}`, body: (p) => `تیکت ${p.no} («${p.subject}»): پیام تازه دارید.` },
   "ticket.staff_message": { title: "پیام تازه در تیکت", link: (p) => `/admin/tickets/${p.id}`, body: (p) => `تیکت ${p.no} («${p.subject}») منتظر پاسخ صندوق است.` },
   "ticket.escalated": { title: "تیکت بی‌پاسخ", link: (p) => `/admin/tickets/${p.id}`, body: (p) => `تیکت ${p.no} («${p.subject}») از زمان هدف پاسخ گذشته است.` },
+  "case.visit_proposed": {
+    title: "زمان بازدید پیشنهاد شد", sms: true, link: () => "/case/visit",
+    body: (p) => `صندوق برای بازدید از شرکت (پرونده‌ی ${p.no}) تاریخ ${p.date} ساعت ${p.time} را پیشنهاد داده است. لطفاً در برنامه تأیید کنید یا زمان دیگری بخواهید.`,
+  },
+  "case.visit_confirmed": { title: "بازدید تأیید شد", link: (p) => `/admin/cases/${p.case_id}`, body: (p) => `متقاضی بازدید پرونده‌ی ${p.no} در ${p.date} ساعت ${p.time} را تأیید کرد.` },
+  "case.visit_reminder": {
+    title: "یادآوری بازدید فردا", sms: true, link: () => "/case/visit",
+    body: (p) => `بازدید پرونده‌ی ${p.no} فردا ساعت ${p.time} است. اصل اجازه‌نامه‌های استعلام و گواهی‌های امضا را آماده‌ی تحویل کنید.`,
+  },
+  "case.limit_issued": { title: "حد اعتباری شما تعیین شد", sms: true, link: () => "/case/limit", body: (p) => `حد اعتباری پرونده‌ی ${p.no} تعیین شد. جزئیات را در برنامه ببینید.` },
+  "case.declined": { title: "نتیجه‌ی بررسی پرونده", sms: true, link: () => "/case/limit", body: (p) => `صندوق برای پرونده‌ی ${p.no} حد اعتباری تعیین نکرد. ${p.note}` },
   "invoice.paid": { title: "صورت‌حساب پرداخت شد", body: (p) => `صورت‌حساب ${p.no} به مبلغ ${p.amount} پرداخت شد.`, link: (p) => `/invoices/${p.id}` },
   "application.expired": { title: "درخواست منقضی شد", body: (p) => `درخواست ${p.no} به دلیل عدم فعالیت منقضی شد.`, link: (p) => `/applications/${p.id}` },
 } satisfies Record<string, Tpl>;

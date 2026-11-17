@@ -70,7 +70,7 @@ describe("form completeness (§4)", () => {
     expect(sectionProblems("cvs", { entries: [{ national_id: "0012345678", position: "مدیرعامل", field_degree: "دکتری مواد", experience_years: 12 }] }, { board })).toEqual(["entries.0087654321"]);
   });
   it("locations need a head office; knowledge-based fields only when yes", () => {
-    expect(sectionProblems("locations", { rows: [{ id: "L2", usage: "factory", area_m2: 500, ownership: "leased", address: "x", postcode: "1" }] })).toEqual(["rule:head_office_required"]);
+    expect(sectionProblems("locations", { rows: [{ id: "L2", usage: "factory", area_m2: 500, ownership: "leased", province: "البرز", address: "x", postcode: "1" }] })).toEqual(["rule:head_office_required"]);
     expect(sectionProblems("knowledge_based", { is_knowledge_based: false })).toEqual([]);
     expect(sectionProblems("knowledge_based", { is_knowledge_based: true, type: "فناور" })).toEqual(["approval_date", "validity_date", "products", "field"]);
   });
@@ -101,5 +101,20 @@ describe("tickets (§6c)", () => {
   it("messages hand the ticket over; a new message reopens a closed one", () => {
     expect(canTransition(TICKET, "waiting_fund", "waiting_applicant")).toBe(true);
     expect(canTransition(TICKET, "closed", "waiting_fund")).toBe(true);
+  });
+});
+
+import { feeRegion, VISIT, ROUND } from "../src/index.js";
+describe("visit, rounds, fee region", () => {
+  it("fee region follows the factory, else the head office", () => {
+    expect(feeRegion([{ usage: "head_office", province: "تهران" }, { usage: "factory", province: "البرز" }])).toBe("outside");
+    expect(feeRegion([{ usage: "head_office", province: "تهران" }])).toBe("tehran");
+    expect(feeRegion([{ usage: "head_office", province: "اصفهان" }, { usage: "workshop", province: "تهران" }])).toBe("tehran");
+  });
+  it("machines", () => {
+    expect(canTransition(VISIT, "proposed", "done")).toBe(false);
+    expect(canTransition(VISIT, "confirmed", "done")).toBe(true);
+    expect(canTransition(ROUND, "sent_back", "pending_approval")).toBe(true);
+    expect(canTransition(ROUND, "approved", "pending_approval")).toBe(false);
   });
 });

@@ -243,7 +243,7 @@ export function sectionProblems(section: FormSection, d: Data | undefined, all: 
     case "locations": {
       const rows: Data[] = d.rows ?? [];
       if (!rows.length) return ["rows"];
-      const p = rows.flatMap((r, i) => need(r, ["id", "usage", "area_m2", "ownership", "address", "postcode"], `rows.${i}.`));
+      const p = rows.flatMap((r, i) => need(r, ["id", "usage", "area_m2", "ownership", "province", "address", "postcode"], `rows.${i}.`));
       if (!rows.some((r) => r.usage === "head_office")) p.push("rule:head_office_required");
       return p;
     }
@@ -340,4 +340,40 @@ export function yearProblems(f: Partial<Record<string, string>> | undefined): st
   if (p.length) return p.map((k) => `field:${k}`);
   const s = statement(toFinancialYear(f!));
   return s.balanceDifference !== 0 ? [`rule:not_balanced:${s.balanceDifference}`] : [];
+}
+
+// ------------------------------------------------------------------ site visit (D-C16) and assessment rounds (§6.6)
+
+/**
+ * The fund proposes a date; the applicant confirms in the app or asks for another date (which opens a ticket).
+ * A new proposal cancels the previous one. The visit report closes it (findings, photos, originals received).
+ */
+export type VisitState = "proposed" | "confirmed" | "change_requested" | "done" | "cancelled";
+export const VISIT: Machine<VisitState> = {
+  proposed: ["confirmed", "change_requested", "cancelled"],
+  change_requested: ["cancelled"],
+  confirmed: ["done", "cancelled"],
+  done: [],
+  cancelled: [],
+};
+
+/** One scoring round: the analyst prepares, the fund manager (never the preparer) approves, sends back or declines. */
+export type RoundState = "preparing" | "pending_approval" | "sent_back" | "approved" | "declined";
+export const ROUND: Machine<RoundState> = {
+  preparing: ["pending_approval"],
+  pending_approval: ["approved", "sent_back", "declined"],
+  sent_back: ["pending_approval"],
+  approved: [],
+  declined: [],
+};
+
+/** Credit limits are valid for 12 months (Q9). */
+export const LIMIT_VALIDITY_MONTHS = 12;
+
+/** D-C13: Tehran or outside Tehran, by where the company works — factory or workshop first, else the head office. */
+export function feeRegion(locations: readonly { usage?: string; province?: string }[] | undefined): "tehran" | "outside" {
+  const rows = locations ?? [];
+  const works = rows.filter((r) => r.usage === "factory" || r.usage === "workshop");
+  const basis = works.length ? works : rows.filter((r) => r.usage === "head_office");
+  return basis.some((r) => (r.province ?? "").trim() === "تهران") ? "tehran" : "outside";
 }

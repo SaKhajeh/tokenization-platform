@@ -5,6 +5,7 @@
  *   cobank.settlements.poll every 120 s — track sent withdrawals at Jibit → completed / failed / reverted
  *   notifications.sms       every 30 s  — deliver queued SMS
  *   tickets.escalate        every 600 s — overdue tickets (waiting for the fund) → fund manager
+ *   visits.remind           every 3600 s — SMS the day before a confirmed site visit
  *   kyb.expiry              hourly      — reminders 30/7 days ahead, expiry + on-chain revoke
  *   applications.expiry     hourly      — drafts/returned applications inactive for 60 days
  * Each job holds a DB lease, so running two workers is safe (the second one skips).
@@ -25,6 +26,7 @@ import { KybService } from "./kyb/kyb.service.js";
 import { ApplicationsService } from "./applications/applications.service.js";
 import { WithdrawalsService } from "./withdrawals/withdrawals.service.js";
 import { TicketsService } from "./tickets/tickets.service.js";
+import { LimitsService } from "./cases/limits.service.js";
 
 const log = new Logger("worker");
 
@@ -40,6 +42,7 @@ async function main() {
   const apps = ctx.get(ApplicationsService);
   const withdrawals = ctx.get(WithdrawalsService);
   const tickets = ctx.get(TicketsService);
+  const limits = ctx.get(LimitsService);
 
   let stopping = false;
   const every = (name: string, ms: number, fn: () => Promise<unknown>) => {
@@ -64,6 +67,7 @@ async function main() {
   every("kyb.expiry", 3_600_000, () => kyb.runExpiry());
   every("applications.expiry", 3_600_000, () => withLease(db, "applications.expiry", 600, () => apps.expireInactive()));
   every("tickets.escalate", 600_000, () => tickets.escalateOverdue());
+  every("visits.remind", 3_600_000, () => limits.remindVisits());
 
   const stop = async () => {
     stopping = true;
