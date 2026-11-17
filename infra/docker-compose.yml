@@ -1,0 +1,54 @@
+# Local development stack. Not for production.
+# Start: npm run infra:up   ·  Stop: npm run infra:down
+# Local chain: run `npm run node -w @tp/contracts` (Hardhat, chainId 31337, :8545) on the host.
+name: tokenization-platform
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: tp
+      POSTGRES_PASSWORD: tp_dev_password
+      POSTGRES_DB: tp
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tp"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: tp
+      MINIO_ROOT_PASSWORD: tp_dev_password
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+
+  # Secrets + key material for the operator signing key (dev mode: in-memory, root token below)
+  openbao:
+    image: openbao/openbao:latest
+    command: server -dev -dev-root-token-id=dev-root-token -dev-listen-address=0.0.0.0:8200
+    cap_add: [IPC_LOCK]
+    ports: ["8200:8200"]
+
+  # Signs transactions for the operator key; the app never holds private keys.
+  # Dev: one file-based key under infra/web3signer/keys (create it, see infra/README.md).
+  web3signer:
+    image: consensys/web3signer:latest
+    command: >
+      --http-listen-host=0.0.0.0 --http-host-allowlist=*
+      --key-store-path=/keys
+      eth1 --chain-id=31337 --downstream-http-host=host.docker.internal --downstream-http-port=8545
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["9002:9000"]
+    volumes: ["./web3signer/keys:/keys:ro"]
+
+volumes:
+  pgdata:
+  miniodata:

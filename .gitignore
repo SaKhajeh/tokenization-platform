@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+coverage.json
+.env
+.env.*
+!.env.example
+packages/contracts/artifacts/
+packages/contracts/cache/
+packages/contracts/typechain-types/
+packages/contracts/deployments/hardhat.json
+packages/contracts/deployments/localhost.json
+infra/web3signer/keys/
+.DS_Store

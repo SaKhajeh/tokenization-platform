@@ -1,0 +1,16 @@
+{
+  "name": "tokenization-platform",
+  "private": true,
+  "description": "Farsi RWA tokenization platform: fund-assessed fixed-return series, tokenised on Polygon PoS",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "npm run test -w @tp/domain && npm run test -w @tp/contracts && npm run test -w @tp/api",
+    "test:domain": "npm run test -w @tp/domain",
+    "test:contracts": "npm run test -w @tp/contracts",
+    "coverage:contracts": "npm run coverage -w @tp/contracts",
+    "typecheck": "npm run typecheck -w @tp/domain",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down"
+  }
+}

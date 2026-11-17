@@ -1,0 +1,24 @@
+{
+  "name": "@tp/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared domain logic: money, Jalali calendar, return engine, state machines, terms hashing",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "jalaali-js": "^1.2.8"
+  },
+  "devDependencies": {
+    "@types/jalaali-js": "^1.2.0",
+    "@types/node": "^26.6.6",
+    "typescript": "~5.6.3",
+    "vitest": "^2.1.9"
+  }
+}
