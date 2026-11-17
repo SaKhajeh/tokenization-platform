@@ -6,3 +6,4 @@ export * from "./stateMachines.js";
 export * from "./termsHash.js";
 export * from "./pricing.js";
 export * from "./creditScoring.js";
+export * from "./caseFile.js";
