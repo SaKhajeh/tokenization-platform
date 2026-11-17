@@ -426,8 +426,9 @@ export class LimitsService {
 
   /**
    * S-11 "limit check": the analyst sets the project's Ra and Re (with a reason); project ceiling = remaining norm × Ra × Re.
-   * If the requested amount fits, it is reserved in the usage ledger and the application moves on (D-C22: the steps
-   * after this — due diligence, committee, contracts — are not specified yet). If not, nothing is reserved.
+   * If the requested amount fits, the application moves on (D-C22: the steps after this — due diligence, committee,
+   * contracts — are not specified yet). Nothing is held: the amount is deducted from the limit only when the financing
+   * is approved (decided 2026-11-17), so that approval must check the limit again.
    */
   async checkApplication(req: AppRequest, appId: string, input: { ra: number; re: number; reason: string }) {
     return this.db.tx(async (q) => {
@@ -440,14 +441,7 @@ export class LimitsService {
       const amount = BigInt(a.requested_amount);
       const chk = limitCheck(m(l.norm_ceiling_rials), usages.map((u: any) => ({ id: u.id, amount: m(u.amount_rials), ra: Number(u.ra), re: Number(u.re), active: u.active })),
         { ra: input.ra, re: input.re, amount: m(amount) });
-      let usageId: string | null = null;
-      if (chk.fits) {
-        usageId = uuidv7();
-        await q.query(
-          `insert into limit_usages (id, org_id, source_type, source_id, description, amount_rials, ra, re, created_by) values ($1,$2,'application',$3,$4,$5,$6,$7,$8)`,
-          [usageId, a.applicant_org_id, a.id, `درخواست ${a.application_no}`, amount.toString(), input.ra, input.re, req.user!.id],
-        );
-      }
+      const usageId: string | null = null; // nothing is held until the financing is approved
       const id = uuidv7();
       await q.query(
         `insert into application_limit_checks (id, application_id, credit_limit_id, ra, re, reason, amount_rials, remaining_norm_rials, project_ceiling_rials, fits, usage_id, checked_by)
@@ -458,7 +452,7 @@ export class LimitsService {
       await this.audit.append(q, { ...actor(req), orgId: a.applicant_org_id, action: chk.fits ? "application.limit_check_passed" : "application.limit_check_failed", entityType: "application", entityId: a.id, after: { ...input, project_ceiling: toRials(chk.projectCeiling).toString() } });
       return {
         id, fits: chk.fits, amount: amount.toString(), project_ceiling: toRials(chk.projectCeiling).toString(), remaining_norm: toRials(Math.max(chk.remainingNorm, 0)).toString(),
-        shortfall: toRials(chk.shortfall).toString(), application_status: a.status, reserved_usage_id: usageId,
+        shortfall: toRials(chk.shortfall).toString(), application_status: a.status,
       };
     });
   }

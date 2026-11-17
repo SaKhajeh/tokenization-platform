@@ -37,42 +37,38 @@ async function screened(a: any, prep: Session, appr: Session, amount: string) {
 }
 
 describe("limit check for applications (plan/07 §9, S-11)", () => {
-  it("reserves what fits, refuses what does not, and gives back a withdrawn application's share", async () => {
+  it("checks the amount against the remaining limit without holding anything until approval", async () => {
     const a = await approvedOrg(t, 111, { compliance: co });
     await grantCreditLimit(t, a.orgId, a.admin.userId); // limit 200 billion rials at Ra 0.8 × Re 0.7
     const prep = await addMember(t, a.admin, a.orgId, "09124440111", "preparer");
     const appr = await addMember(t, a.admin, a.orgId, "09125550111", "approver");
     const first = await screened(a, prep, appr, "20000000000");
-    const second = await screened(a, prep, appr, "190000000000");
+    const second = await screened(a, prep, appr, "210000000000");
 
     const reason = "ریسک فنی پروژه متوسط؛ بازار فروش تضمین‌شده";
     expect((await t.http.post(`${V}/admin/applications/${first}/limit-check`).set(an.auth).send({ ra: 0.8, re: 0.7 })).status).toBe(400); // reason required
     const c1 = await t.http.post(`${V}/admin/applications/${first}/limit-check`).set(an.auth).send({ ra: 0.8, re: 0.7, reason }).expect(200);
     expect(c1.body).toMatchObject({ fits: true, application_status: "due_diligence", shortfall: "0" });
     expect(Number(c1.body.project_ceiling)).toBeCloseTo(200e9, -3);
+    // nothing is held: the limit is untouched
     let lim = (await t.http.get(`${V}/admin/orgs/${a.orgId}/credit-limit`).set(an.auth).expect(200)).body;
-    expect(lim.usages.map((u: any) => [u.source_type, u.amount, u.active])).toEqual([["application", "20000000000", true]]);
-    expect(Number(lim.available)).toBeCloseTo(180e9, -3);
+    expect(lim.usages).toEqual([]);
+    expect(Number(lim.available)).toBeCloseTo(200e9, -3);
 
-    // the second request no longer fits: nothing reserved, the application stays in credit assessment
+    // too large: does not fit, stays in credit assessment
     const c2 = await t.http.post(`${V}/admin/applications/${second}/limit-check`).set(an.auth).send({ ra: 0.8, re: 0.7, reason }).expect(200);
-    expect(c2.body).toMatchObject({ fits: false, application_status: "credit_assessment", reserved_usage_id: null });
+    expect(c2.body).toMatchObject({ fits: false, application_status: "credit_assessment" });
     expect(Number(c2.body.shortfall)).toBeCloseTo(10e9, -3);
-    // a riskier view of the same project gives even less room
+    // a riskier view of the same project gives less room
     const c3 = await t.http.post(`${V}/admin/applications/${second}/limit-check`).set(an.auth).send({ ra: 0.5, re: 0.5, reason }).expect(200);
     expect(Number(c3.body.project_ceiling)).toBeLessThan(Number(c2.body.project_ceiling));
-    expect((await t.db.query(`select count(*)::int n from application_limit_checks where application_id = $1`, [second])).rows[0].n).toBe(2);
-
-    // the first application is withdrawn → its reservation is released
-    await t.http.post(`${V}/applications/${first}/withdraw`).set(a.admin.auth).set(a.org).send({ reason: "منصرف شدیم" }).expect(200);
-    lim = (await t.http.get(`${V}/admin/orgs/${a.orgId}/credit-limit`).set(an.auth).expect(200)).body;
-    expect(lim.usages[0].active).toBe(false);
-    expect(Number(lim.available)).toBeCloseTo(200e9, -3);
-    // now the second one fits
+    // an existing guarantee with the fund does use the limit
+    lim = (await t.http.post(`${V}/admin/orgs/${a.orgId}/limit-usages`).set(an.auth).send({ source_type: "existing_guarantee", description: "ضمانت‌نامه‌ی فعال", amount: "60000000000", ra: 0.8, re: 0.7 }).expect(201)).body;
     const c4 = await t.http.post(`${V}/admin/applications/${second}/limit-check`).set(an.auth).send({ ra: 0.8, re: 0.7, reason }).expect(200);
-    expect(c4.body.fits).toBe(true);
+    expect(Number(c4.body.project_ceiling)).toBeCloseTo(140e9, -3);
+    expect((await t.db.query(`select count(*)::int n, bool_and(usage_id is null) none from application_limit_checks where application_id = $1`, [second])).rows[0]).toEqual({ n: 3, none: true });
     // a limit check only in credit assessment
-    expect((await t.http.post(`${V}/admin/applications/${second}/limit-check`).set(an.auth).send({ ra: 0.8, re: 0.7, reason })).body.error.code).toBe("WRONG_STATE");
+    expect((await t.http.post(`${V}/admin/applications/${first}/limit-check`).set(an.auth).send({ ra: 0.8, re: 0.7, reason })).body.error.code).toBe("WRONG_STATE");
   });
 
   it("expires limits and closes idle cases every day; an expired limit blocks new applications", async () => {

@@ -95,7 +95,7 @@ export class ApplicationsService {
       a.id, a.status, to, actorId, reason ?? null, details === undefined ? null : JSON.stringify(details),
     ]);
     a.status = to;
-    // an application that ends gives back the part of the credit limit reserved at its limit check
+    // an application that ends gives back any part of the credit limit deducted for it (deduction happens at approval)
     if (["withdrawn", "rejected", "expired"].includes(to)) {
       await q.query(
         `update limit_usages set active = false, released_by = $2, released_at = now(), release_reason = $3 where source_type = 'application' and source_id = $1 and active`,
