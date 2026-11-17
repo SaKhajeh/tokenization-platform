@@ -29,6 +29,8 @@ import { CasesService } from "./cases.service.js";
 import { assessmentFee, currentTariff } from "./fees.js";
 import { TicketsService } from "../tickets/tickets.service.js";
 import { withLease } from "../common/lease.js";
+import { ApplicationsService } from "../applications/applications.service.js";
+import { limitCheck } from "@tp/domain";
 
 const err = {
   noFee: () => new ApiError(409, "NO_FEE_DUE", "No assessment fee is due for this case", "هزینه‌ی ارزیابی برای این پرونده تعیین نشده است."),
@@ -57,6 +59,7 @@ export class LimitsService {
     private readonly notifications: NotificationsService,
     private readonly cases: CasesService,
     private readonly tickets: TicketsService,
+    private readonly apps: ApplicationsService,
   ) {}
 
   // ================================================================== tariff (§6d)
@@ -340,6 +343,7 @@ export class LimitsService {
           [limit.id, c.org_id, caseId, round.id, limit.limit_rials.toString(), limit.norm.toString(), round.judgement.ra, round.judgement.re, JSON.stringify(ceilings), limit.valid_from, limit.valid_to],
         );
         await this.cases.move(q, c, "limit_issued", req.user!.id);
+        await q.query(`update orgs set is_applicant = true, updated_at = now() where id = $1`, [c.org_id]);
         await this.notifications.notify(q, { to: { orgId: c.org_id }, event: "case.limit_issued", params: { no: c.case_no } });
       } else if (to === "sent_back") {
         await this.cases.move(q, c, "sent_back_to_analyst", req.user!.id, input.reason);
@@ -418,6 +422,81 @@ export class LimitsService {
       await this.audit.append(q, { ...actor(req), orgId, action: "limit.usage_added", entityType: "limit_usage", entityId: id, after: input });
       return this.limitStatus(q, orgId, true);
     });
+  }
+
+  /**
+   * S-11 "limit check": the analyst sets the project's Ra and Re (with a reason); project ceiling = remaining norm × Ra × Re.
+   * If the requested amount fits, it is reserved in the usage ledger and the application moves on (D-C22: the steps
+   * after this — due diligence, committee, contracts — are not specified yet). If not, nothing is reserved.
+   */
+  async checkApplication(req: AppRequest, appId: string, input: { ra: number; re: number; reason: string }) {
+    return this.db.tx(async (q) => {
+      const a = await this.apps.load(q, appId, undefined, true);
+      if (a.status !== "credit_assessment") throw err.state("A limit check", a.status);
+      const l = await this.activeLimit(q, a.applicant_org_id);
+      if (!l) throw err.noLimit();
+      const usages = (await q.query(`select * from limit_usages where org_id = $1 order by created_at`, [a.applicant_org_id])).rows;
+      const m = (r: string | bigint) => Number(BigInt(r)) / 1e6;
+      const amount = BigInt(a.requested_amount);
+      const chk = limitCheck(m(l.norm_ceiling_rials), usages.map((u: any) => ({ id: u.id, amount: m(u.amount_rials), ra: Number(u.ra), re: Number(u.re), active: u.active })),
+        { ra: input.ra, re: input.re, amount: m(amount) });
+      let usageId: string | null = null;
+      if (chk.fits) {
+        usageId = uuidv7();
+        await q.query(
+          `insert into limit_usages (id, org_id, source_type, source_id, description, amount_rials, ra, re, created_by) values ($1,$2,'application',$3,$4,$5,$6,$7,$8)`,
+          [usageId, a.applicant_org_id, a.id, `درخواست ${a.application_no}`, amount.toString(), input.ra, input.re, req.user!.id],
+        );
+      }
+      const id = uuidv7();
+      await q.query(
+        `insert into application_limit_checks (id, application_id, credit_limit_id, ra, re, reason, amount_rials, remaining_norm_rials, project_ceiling_rials, fits, usage_id, checked_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [id, a.id, l.id, input.ra, input.re, input.reason, amount.toString(), toRials(Math.max(chk.remainingNorm, 0)).toString(), toRials(chk.projectCeiling).toString(), chk.fits, usageId, req.user!.id],
+      );
+      if (chk.fits) await this.apps.move(q, a, "due_diligence", req.user!.id, "limit check passed", { limit_check_id: id });
+      await this.audit.append(q, { ...actor(req), orgId: a.applicant_org_id, action: chk.fits ? "application.limit_check_passed" : "application.limit_check_failed", entityType: "application", entityId: a.id, after: { ...input, project_ceiling: toRials(chk.projectCeiling).toString() } });
+      return {
+        id, fits: chk.fits, amount: amount.toString(), project_ceiling: toRials(chk.projectCeiling).toString(), remaining_norm: toRials(Math.max(chk.remainingNorm, 0)).toString(),
+        shortfall: toRials(chk.shortfall).toString(), application_status: a.status, reserved_usage_id: usageId,
+      };
+    });
+  }
+
+  /** Daily: expire credit limits past their validity; close cases left without activity (Q9; plan/07 §2). */
+  async housekeeping(inactiveDays = 90) {
+    const res = await withLease(this.db, "cases.housekeeping", 600, async () => {
+      const today = tehranToday();
+      const out = { limits_expired: 0, cases_closed: 0 };
+      const limits = (await this.db.query(`select * from credit_limits where status = 'active' and valid_to < $1`, [today])).rows;
+      for (const l of limits) {
+        await this.db.tx(async (q) => {
+          const r = await q.query(`update credit_limits set status = 'expired' where id = $1 and status = 'active' returning id`, [l.id]);
+          if (!r.rows[0]) return;
+          const c = await this.cases.caseById(q, l.case_id, true);
+          if (c.state === "limit_issued") await this.cases.move(q, c, "expired", null, "credit limit validity ended");
+          await this.notifications.notify(q, { to: { orgId: l.org_id, orgRoles: ["org_admin"] }, event: "case.limit_expired", params: { no: c.case_no } });
+          await this.audit.append(q, { actorType: "system", orgId: l.org_id, action: "limit.expired", entityType: "credit_limit", entityId: l.id });
+          out.limits_expired++;
+        });
+      }
+      const idle = (await this.db.query(
+        `select id from cases where state in ('opened','in_preparation','returned') and last_activity_at < now() - ($1 || ' days')::interval`, [String(inactiveDays)],
+      )).rows;
+      for (const row of idle) {
+        await this.db.tx(async (q) => {
+          const c = await this.cases.caseById(q, row.id, true);
+          if (!["opened", "in_preparation", "returned"].includes(c.state)) return;
+          await this.cases.move(q, c, "closed_inactive", null, `no activity for ${inactiveDays} days`);
+          await closeWorkflowTasks(q, "case", c.id, null);
+          await this.notifications.notify(q, { to: { orgId: c.org_id, orgRoles: ["org_admin"] }, event: "case.closed_inactive", params: { no: c.case_no, days: inactiveDays } });
+          await this.audit.append(q, { actorType: "system", orgId: c.org_id, action: "case.closed_inactive", entityType: "case", entityId: c.id });
+          out.cases_closed++;
+        });
+      }
+      return out;
+    });
+    return res ?? { skipped: "another worker holds the lease" };
   }
 
   async releaseUsage(req: AppRequest, usageId: string, reason: string) {

@@ -200,3 +200,27 @@ export async function verifiedAccount(t: TestApp, s: Session, orgId: string, nat
   const r = await t.http.post("/api/v1/bank-accounts").set(s.auth).set({ "x-org-id": orgId, "x-step-up-token": su }).set(idem()).send(body).expect(201);
   return { id: r.body.id as string, iban: i };
 }
+
+/**
+ * Test fixture: gives an org an approved credit case and an active credit limit without running the whole case
+ * (that flow has its own tests in cases.test.ts / limits.test.ts). Amounts in rials.
+ */
+export async function grantCreditLimit(t: TestApp, orgId: string, byUserId: string, limitRials = 200_000_000_000n, normRials = 357_142_857_143n, ra = 0.8, re = 0.7) {
+  const { DEFAULT_SCORING_METHOD } = await import("@tp/domain");
+  await t.db.query(`insert into scoring_methods (version, config, note) values (1, $1, 'built-in default') on conflict do nothing`, [JSON.stringify(DEFAULT_SCORING_METHOD)]);
+  const id = () => crypto.randomUUID();
+  const caseId = id(), roundId = id(), limitId = id();
+  await t.db.query(`insert into cases (id, org_id, case_no, state, latest_fiscal_year) values ($1,$2,$3,'limit_issued',1404)`, [caseId, orgId, `CR-T-${caseId.slice(0, 8)}`]);
+  await t.db.query(
+    `insert into assessment_rounds (id, case_id, round_no, state, method_version, activity_type, judgement, inputs, outputs, prepared_by) values ($1,$2,1,'approved',1,'production_line',$3,'[]','{}',$4)`,
+    [roundId, caseId, JSON.stringify({ rc: 0.9, ra, re }), byUserId],
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  const next = new Date(Date.now() + 365 * 86400_000).toISOString().slice(0, 10);
+  await t.db.query(
+    `insert into credit_limits (id, org_id, case_id, round_id, limit_rials, norm_ceiling_rials, ra, re, ceilings, valid_from, valid_to) values ($1,$2,$3,$4,$5,$6,$7,$8,'{}',$9,$10)`,
+    [limitId, orgId, caseId, roundId, limitRials.toString(), normRials.toString(), ra, re, today, next],
+  );
+  await t.db.query(`update orgs set is_applicant = true where id = $1`, [orgId]);
+  return { caseId, limitId };
+}

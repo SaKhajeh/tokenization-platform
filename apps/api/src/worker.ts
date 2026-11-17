@@ -6,6 +6,7 @@
  *   notifications.sms       every 30 s  — deliver queued SMS
  *   tickets.escalate        every 600 s — overdue tickets (waiting for the fund) → fund manager
  *   visits.remind           every 3600 s — SMS the day before a confirmed site visit
+ *   cases.housekeeping      every 3600 s — expire credit limits; close cases idle for 90 days
  *   kyb.expiry              hourly      — reminders 30/7 days ahead, expiry + on-chain revoke
  *   applications.expiry     hourly      — drafts/returned applications inactive for 60 days
  * Each job holds a DB lease, so running two workers is safe (the second one skips).
@@ -68,6 +69,7 @@ async function main() {
   every("applications.expiry", 3_600_000, () => withLease(db, "applications.expiry", 600, () => apps.expireInactive()));
   every("tickets.escalate", 600_000, () => tickets.escalateOverdue());
   every("visits.remind", 3_600_000, () => limits.remindVisits());
+  every("cases.housekeeping", 3_600_000, () => limits.housekeeping());
 
   const stop = async () => {
     stopping = true;

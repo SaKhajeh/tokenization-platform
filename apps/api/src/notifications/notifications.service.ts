@@ -82,6 +82,8 @@ export const TEMPLATES = {
   },
   "case.limit_issued": { title: "حد اعتباری شما تعیین شد", sms: true, link: () => "/case/limit", body: (p) => `حد اعتباری پرونده‌ی ${p.no} تعیین شد. جزئیات را در برنامه ببینید.` },
   "case.declined": { title: "نتیجه‌ی بررسی پرونده", sms: true, link: () => "/case/limit", body: (p) => `صندوق برای پرونده‌ی ${p.no} حد اعتباری تعیین نکرد. ${p.note}` },
+  "case.limit_expired": { title: "اعتبار حد اعتباری به پایان رسید", sms: true, link: () => "/case/limit", body: (p) => `اعتبار حد اعتباری پرونده‌ی ${p.no} به پایان رسید؛ برای تمدید، پرونده را به‌روز کنید.` },
+  "case.closed_inactive": { title: "پرونده بسته شد", sms: true, link: () => "/case", body: (p) => `پرونده‌ی ${p.no} به دلیل ${p.days} روز بدون فعالیت بسته شد.` },
   "invoice.paid": { title: "صورت‌حساب پرداخت شد", body: (p) => `صورت‌حساب ${p.no} به مبلغ ${p.amount} پرداخت شد.`, link: (p) => `/invoices/${p.id}` },
   "application.expired": { title: "درخواست منقضی شد", body: (p) => `درخواست ${p.no} به دلیل عدم فعالیت منقضی شد.`, link: (p) => `/applications/${p.id}` },
 } satisfies Record<string, Tpl>;

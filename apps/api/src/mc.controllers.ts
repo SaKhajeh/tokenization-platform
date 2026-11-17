@@ -8,7 +8,6 @@ import { StepUp } from "./common/stepup.js";
 import { Idempotent } from "./common/idempotency.js";
 import type { AppRequest } from "./common/context.js";
 import { parse, zIsoDate, zUuid } from "./common/zod.js";
-import { ApplicantsService } from "./applicants/applicants.service.js";
 import { ApplicationsService, INVESTMENT_TYPES } from "./applications/applications.service.js";
 import { NotificationsService } from "./notifications/notifications.service.js";
 import { KybService } from "./kyb/kyb.service.js";
@@ -44,66 +43,6 @@ const zApplicationFields = {
 };
 
 // ------------------------------------------------------------------ applicant onboarding (D14: companies apply; the fund issues)
-
-@Controller()
-export class ApplicantsController {
-  constructor(private readonly issuers: ApplicantsService) {}
-
-  @Get("applicant-profile")
-  @OrgRoute()
-  get(@Req() req: AppRequest) {
-    return this.issuers.get(req);
-  }
-
-  @Post("applicant-profile")
-  @OrgRoute("org_admin")
-  @StepUp()
-  @Idempotent()
-  request(@Req() req: AppRequest, @Body() body: unknown) {
-    const b = parse(
-      z.object({
-        tax_id: z.string().regex(/^\d{10,14}$/),
-        sector: zText(2, 100),
-        main_activity: zText(10, 1000),
-        management: z.array(z.object({ name: zText(3, 100), position: zText(2, 100), experience_years: z.number().int().min(0).max(70).optional() })).min(1).max(20),
-        existing_debts: z.array(z.object({ lender: zText(2, 100), amount: zRial, maturity: zIsoDate.optional() })).max(30),
-        financial_doc_ids: z.array(zUuid).min(1).max(10),
-      }),
-      body,
-    );
-    return this.issuers.request(req, b);
-  }
-
-  @Get("admin/applicant-profiles")
-  @StaffOnly("analyst", "compliance_officer", "fund_manager", "auditor", "super_admin")
-  list(@Query() query: unknown) {
-    return this.issuers.list(parse(z.object({ status: z.enum(["in_review", "info_requested", "approved", "rejected"]).optional() }), query).status);
-  }
-
-  @Get("admin/applicant-profiles/:org_id")
-  @StaffOnly("analyst", "compliance_officer", "fund_manager", "auditor", "super_admin")
-  detail(@Param() p: unknown) {
-    return this.issuers.detail(parse(zOrgId, p).org_id);
-  }
-
-  @Post("admin/applicant-profiles/:org_id/analyst-review")
-  @HttpCode(200)
-  @StaffOnly("analyst")
-  analyst(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
-    const b = parse(z.object({ recommendation: z.enum(["approve", "reject", "request_info"]), comment: zText(3, 2000) }), body);
-    return this.issuers.analystReview(req, parse(zOrgId, p).org_id, b);
-  }
-
-  @Post("admin/applicant-profiles/:org_id/decision")
-  @HttpCode(200)
-  @StaffOnly("compliance_officer")
-  decide(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
-    const b = parse(z.object({ decision: z.enum(["approve", "reject", "request_info"]), reason: z.string().trim().max(2000).optional() }), body);
-    return this.issuers.decide(req, parse(zOrgId, p).org_id, b);
-  }
-}
-
-// ------------------------------------------------------------------ initiatives + applications
 
 @Controller()
 export class ApplicationsController {
@@ -247,11 +186,12 @@ export class JobsController {
   @HttpCode(200)
   @StaffOnly("super_admin")
   run(@Param() p: unknown) {
-    const { name } = parse(z.object({ name: z.enum(["kyb-expiry", "application-expiry", "sms", "ticket-escalation", "visit-reminders"]) }), p);
+    const { name } = parse(z.object({ name: z.enum(["kyb-expiry", "application-expiry", "sms", "ticket-escalation", "visit-reminders", "case-housekeeping"]) }), p);
     if (name === "kyb-expiry") return this.kyb.runExpiry();
     if (name === "application-expiry") return this.apps.expireInactive();
     if (name === "ticket-escalation") return this.tickets.escalateOverdue();
     if (name === "visit-reminders") return this.limits.remindVisits();
+    if (name === "case-housekeeping") return this.limits.housekeeping();
     return this.n.sendQueuedSms();
   }
 }

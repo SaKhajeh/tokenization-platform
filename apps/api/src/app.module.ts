@@ -35,9 +35,8 @@ import { KybService } from "./kyb/kyb.service.js";
 import { BankAccountsService } from "./bank-accounts/bank-accounts.service.js";
 import { DepositsService } from "./deposits/deposits.service.js";
 import { BankAccountsController, ChainController, KybController, MoneyController, StaffTasksController } from "./mb.controllers.js";
-import { ApplicationsController, ApplicantsController, JobsController, NotificationsController } from "./mc.controllers.js";
+import { ApplicationsController, JobsController, NotificationsController } from "./mc.controllers.js";
 import { NotificationsService } from "./notifications/notifications.service.js";
-import { ApplicantsService } from "./applicants/applicants.service.js";
 import { WithdrawalsService } from "./withdrawals/withdrawals.service.js";
 import { WithdrawalsController } from "./withdrawals/withdrawals.controller.js";
 import { ApplicationsService } from "./applications/applications.service.js";
@@ -71,7 +70,7 @@ export class AppModule {
       controllers: [
         HealthController, AuthController, OrgsController, TasksController, DocumentsController, AuditController,
         KybController, BankAccountsController, MoneyController, ChainController, StaffTasksController,
-        ApplicantsController, ApplicationsController, NotificationsController, JobsController, WithdrawalsController,
+        ApplicationsController, NotificationsController, JobsController, WithdrawalsController,
         PricingController, InvoicesController, CasesController, TicketsController,
       ],
       // useFactory, not useValue: Nest serialises useValue providers into the module token,
@@ -102,7 +101,6 @@ export class AppModule {
         KybService,
         BankAccountsService,
         NotificationsService,
-        ApplicantsService,
         WithdrawalsService,
         ApplicationsService,
         PricingService,

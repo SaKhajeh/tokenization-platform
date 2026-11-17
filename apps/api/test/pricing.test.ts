@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { makeApp, TestApp, idem, staff, approvedOrg, addMember, stepUp, Session, verifiedAccount } from "./helpers.js";
+import { makeApp, TestApp, idem, staff, approvedOrg, addMember, stepUp, Session, verifiedAccount, grantCreditLimit } from "./helpers.js";
 
 let t: TestApp;
 let co: Session; // compliance officer
@@ -37,18 +37,11 @@ async function doc(s: Session, orgId: string, category = "financial_statement") 
   return up.body.document_id as string;
 }
 
-/** Approved applicant with a submitted, screening-passed application. Returns ids and the members. */
+/** Company with a credit limit and a submitted, screening-passed application. Returns ids and the members. */
 async function screenedApplication(n: number) {
   const a = await approvedOrg(t, n, { compliance: co });
   await t.http.post(`${V}/admin/chain/process`).set(ops.auth).expect(200);
-  const body = {
-    tax_id: "411111111111", sector: "فناوری صنعتی", main_activity: "ساخت حسگرهای صنعتی هوشمند",
-    management: [{ name: "مریم احمدی", position: "مدیرعامل", experience_years: 12 }], existing_debts: [], financial_doc_ids: [await doc(a.admin, a.orgId)],
-  };
-  const su = await stepUp(t, a.admin, "POST", `${V}/applicant-profile`, body);
-  await t.http.post(`${V}/applicant-profile`).set(a.admin.auth).set({ ...a.org, "x-step-up-token": su }).set(idem()).send(body).expect(201);
-  await t.http.post(`${V}/admin/applicant-profiles/${a.orgId}/analyst-review`).set(an.auth).send({ recommendation: "approve", comment: "کامل" }).expect(200);
-  await t.http.post(`${V}/admin/applicant-profiles/${a.orgId}/decision`).set(co.auth).send({ decision: "approve" }).expect(200);
+  await grantCreditLimit(t, a.orgId, a.admin.userId);
 
   const prep = await addMember(t, a.admin, a.orgId, `0912444${String(n).padStart(4, "0")}`, "preparer");
   const appr = await addMember(t, a.admin, a.orgId, `0912555${String(n).padStart(4, "0")}`, "approver");

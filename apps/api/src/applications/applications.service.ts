@@ -54,7 +54,7 @@ const err = {
   transition: (from: string, to: string) =>
     new ApiError(409, "ILLEGAL_TRANSITION", `Cannot go from ${from} to ${to}`, "این تغییر وضعیت برای درخواست مجاز نیست.", { from, to }),
   notEditable: () => new ApiError(409, "NOT_EDITABLE", "Only drafts and returned applications can be edited", "فقط پیش‌نویس یا درخواست برگشتی قابل ویرایش است."),
-  notApplicant: () => new ApiError(403, "APPLICANT_REQUIRED", "The organisation must be an approved applicant", "شرکت باید به‌عنوان متقاضی تأمین مالی تأیید شده باشد."),
+  noLimit: () => new ApiError(403, "CREDIT_LIMIT_REQUIRED", "The organisation needs a valid credit limit from the fund", "برای درخواست تأمین مالی، شرکت باید حد اعتباری معتبر از صندوق داشته باشد."),
   notStarted: () => new ApiError(422, "INITIATIVE_NOT_STARTED", "Only initiatives that have already started can be funded", "فقط طرح‌هایی که آغاز شده‌اند قابل تأمین مالی هستند."),
   noEvidence: () => new ApiError(422, "EVIDENCE_REQUIRED", "Attach evidence that the initiative has started", "مدرکی از آغاز طرح پیوست کنید."),
   docs: () => new ApiError(422, "DOCUMENT_INVALID", "Documents must be uploaded documents of this organisation", "اسناد باید از اسناد بارگذاری‌شده‌ی همین شرکت باشند."),
@@ -88,13 +88,20 @@ export class ApplicationsService {
 
   // ------------------------------------------------------------------ helpers
 
-  private async move(q: Queryable, a: any, to: ApplicationStatus, actorId: string | null, reason?: string | null, details?: unknown) {
+  async move(q: Queryable, a: any, to: ApplicationStatus, actorId: string | null, reason?: string | null, details?: unknown) {
     if (!canTransition(APPLICATION, a.status as ApplicationStatus, to)) throw err.transition(a.status, to);
     await q.query(`update applications set status=$2, last_activity_at=now(), updated_at=now() where id=$1`, [a.id, to]);
     await q.query(`insert into application_events (application_id, from_status, to_status, actor_id, reason, details) values ($1,$2,$3,$4,$5,$6)`, [
       a.id, a.status, to, actorId, reason ?? null, details === undefined ? null : JSON.stringify(details),
     ]);
     a.status = to;
+    // an application that ends gives back the part of the credit limit reserved at its limit check
+    if (["withdrawn", "rejected", "expired"].includes(to)) {
+      await q.query(
+        `update limit_usages set active = false, released_by = $2, released_at = now(), release_reason = $3 where source_type = 'application' and source_id = $1 and active`,
+        [a.id, actorId, `application ${to}`],
+      );
+    }
   }
 
   private async docsOk(q: Queryable, orgId: string, ids: string[]) {
@@ -107,7 +114,7 @@ export class ApplicationsService {
     return !!(await q.query(`select 1 from orgs where id = $1 and status = 'active' and kyb_expires_at > now()`, [orgId])).rows[0];
   }
 
-  private async load(q: Queryable, id: string, orgId?: string, lock = false) {
+  async load(q: Queryable, id: string, orgId?: string, lock = false) {
     const a = (await q.query(`select * from applications where id = $1 ${orgId ? "and applicant_org_id = $2" : ""} ${lock ? "for update" : ""}`, orgId ? [id, orgId] : [id])).rows[0];
     if (!a) throw Errors.notFound("Application");
     return a;
@@ -214,9 +221,10 @@ export class ApplicationsService {
 
   /** Rules that must hold when an application is prepared and again when it is submitted. */
   private async checkSubmittable(q: Queryable, a: any) {
-    const o = (await q.query(`select is_applicant from orgs where id = $1`, [a.applicant_org_id])).rows[0];
     if (!(await this.kybValid(q, a.applicant_org_id))) throw kybRequired();
-    if (!o.is_applicant) throw err.notApplicant();
+    // plan/07 §1, D-C6: a funding application needs a valid credit limit (replaces applicant onboarding, FR-ISS-1)
+    const limit = (await q.query(`select 1 from credit_limits where org_id = $1 and status = 'active' and valid_to >= $2`, [a.applicant_org_id, tehranToday()])).rows[0];
+    if (!limit) throw err.noLimit();
     const ini = (await q.query(`select * from initiatives where id = $1`, [a.initiative_id])).rows[0];
     const started = typeof ini.started_on === "string" ? ini.started_on : isoFromUtcDate(ini.started_on);
     if (started > tehranToday()) throw err.notStarted(); // D10: only initiatives already started

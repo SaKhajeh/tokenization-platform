@@ -377,6 +377,15 @@ export class CasesController {
     return this.limits.addUsage(req, parse(zId, p).id, b);
   }
 
+  /** S-11: limit check for an application in credit assessment (the project's Ra and Re, with a reason). */
+  @Post("admin/applications/:id/limit-check")
+  @HttpCode(200)
+  @StaffOnly("analyst")
+  limitCheck(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(z.object({ ra: z.number().gt(0).max(1), re: z.number().gt(0).max(1), reason: zText(5, 2000) }), body);
+    return this.limits.checkApplication(req, parse(zId, p).id, b);
+  }
+
   @Post("admin/limit-usages/:id/release")
   @HttpCode(200)
   @StaffOnly("analyst", "fund_manager")

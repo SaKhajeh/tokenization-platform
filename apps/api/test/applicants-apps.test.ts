@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getAddress } from "ethers";
-import { makeApp, TestApp, idem, staff, approvedOrg, addMember, stepUp, Session, KYB_FIELDS, orgWithAdmin } from "./helpers.js";
+import { makeApp, TestApp, idem, staff, approvedOrg, addMember, stepUp, Session, KYB_FIELDS, orgWithAdmin, grantCreditLimit } from "./helpers.js";
 
 let t: TestApp;
 let co: Session; // compliance officer
@@ -30,28 +30,11 @@ async function doc(s: Session, orgId: string, category = "financial_statement") 
   return up.body.document_id as string;
 }
 
-const APPLICANT = (docs: string[]) => ({
-  tax_id: "411111111111",
-  sector: "انرژی",
-  main_activity: "طراحی و ساخت سامانه‌های ذخیره‌سازی انرژی",
-  management: [{ name: "علی مدیر", position: "مدیرعامل", experience_years: 15 }],
-  existing_debts: [{ lender: "بانک آزمون", amount: "5000000000", maturity: "2027-03-01" }],
-  financial_doc_ids: docs,
-});
-
-async function requestApplicant(s: Session, orgId: string) {
-  const body = APPLICANT([await doc(s, orgId)]);
-  const su = await stepUp(t, s, "POST", `${V}/applicant-profile`, body);
-  return t.http.post(`${V}/applicant-profile`).set(s.auth).set({ "x-org-id": orgId, "x-step-up-token": su }).set(idem()).send(body);
-}
-
-/** KYB-approved company that is also an approved applicant, with its digital ID registered. */
+/** KYB-approved company with a credit limit (plan/07: the credit case replaces applicant onboarding), digital ID registered. */
 async function approvedApplicant(n: number) {
   const a = await approvedOrg(t, n, { compliance: co });
   await processChain();
-  (await requestApplicant(a.admin, a.orgId)).status === 201 || (() => { throw new Error("applicant request failed"); })();
-  await t.http.post(`${V}/admin/applicant-profiles/${a.orgId}/analyst-review`).set(an.auth).send({ recommendation: "approve", comment: "مدارک کامل است" }).expect(200);
-  await t.http.post(`${V}/admin/applicant-profiles/${a.orgId}/decision`).set(co.auth).send({ decision: "approve" }).expect(200);
+  await grantCreditLimit(t, a.orgId, a.admin.userId);
   return a;
 }
 
@@ -90,40 +73,15 @@ async function submitAs(s: Session, orgId: string, appId: string) {
   return t.http.post(path).set(s.auth).set({ "x-org-id": orgId, "x-step-up-token": su }).set(idem()).send({});
 }
 
-describe("applicant onboarding (companies apply; the fund issues)", () => {
-  it("needs KYB, then an analyst review and a decision by a different person", async () => {
-    const { admin, org, orgId } = await orgWithAdmin(t, "09123330001", "033300001", "3333000001");
-    expect((await requestApplicant(admin, orgId)).body.error.code).toBe("KYB_REQUIRED");
-
-    const a = await approvedOrg(t, 51, { compliance: co });
-    await processChain(); // digital ID registered (investor)
-    const r = await requestApplicant(a.admin, a.orgId);
-    expect(r.status).toBe(201);
-    expect(r.body.status).toBe("in_review");
-    expect((await requestApplicant(a.admin, a.orgId)).body.error.code).toBe("APPLICANT_REQUEST_OPEN");
-
-    const dpath = `${V}/admin/applicant-profiles/${a.orgId}/decision`;
-    expect((await t.http.post(dpath).set(co.auth).send({ decision: "approve" })).body.error.code).toBe("ANALYST_REVIEW_REQUIRED");
-    await t.http.post(`${V}/admin/applicant-profiles/${a.orgId}/analyst-review`).set(both.auth).send({ recommendation: "approve", comment: "خوب" }).expect(200);
-    expect((await t.http.post(dpath).set(both.auth).send({ decision: "approve" })).body.error.code).toBe("MAKER_CHECKER");
-    await t.http.post(dpath).set(co.auth).send({ decision: "approve" }).expect(200);
-
-    const p = await t.http.get(`${V}/applicant-profile`).set(a.admin.auth).set(a.org).expect(200);
-    expect(p.body.is_applicant).toBe(true);
-    expect(p.body.profile.status).toBe("approved");
-
-    // D14: a company never becomes an issuer — its digital ID stays investor-only
+describe("companies apply; the fund issues (D14)", () => {
+  it("a company with a credit limit stays investor-only on-chain and is never an issuer", async () => {
+    const a = await approvedApplicant(51);
     await processChain();
     const w = await t.http.get(`${V}/wallet`).set(a.admin.auth).set(a.org).expect(200);
     expect(t.chain.identities.get(getAddress(w.body.address))!.flags).toBe(1);
-    expect((await t.db.query(`select is_issuer from orgs where id = $1`, [a.orgId])).rows[0]).toEqual({ is_issuer: false });
-
-    // notified in-app and by SMS
-    const n = await t.http.get(`${V}/notifications`).set(a.admin.auth).expect(200);
-    expect(n.body.items.map((x: any) => x.event_key)).toEqual(expect.arrayContaining(["applicant.approved", "kyb.approved", "wallet.registered"]));
-    const sms = await t.http.post(`${V}/admin/jobs/sms/run`).set(ops.auth).expect(200);
-    expect(sms.body.sent).toBeGreaterThan(0);
-    expect(t.sms.sent.some((m) => m.to === a.admin.mobile && m.body.includes("متقاضی"))).toBe(true);
+    expect((await t.db.query(`select is_issuer, is_applicant from orgs where id = $1`, [a.orgId])).rows[0]).toEqual({ is_issuer: false, is_applicant: true });
+    // the old onboarding endpoints are gone
+    expect((await t.http.get(`${V}/applicant-profile`).set(a.admin.auth).set(a.org)).status).toBe(404);
   });
 });
 
@@ -192,12 +150,12 @@ describe("applications", () => {
     expect(notes.body.items.map((x: any) => x.event_key)).toEqual(expect.arrayContaining(["application.returned", "application.passed_screening"]));
   });
 
-  it("enforces applicant status, started initiatives and maker–checker", async () => {
-    // KYB approved but not an approved applicant
+  it("needs a valid credit limit, a started initiative and maker–checker", async () => {
+    // KYB approved but no credit limit
     const plain = await approvedOrg(t, 53, { compliance: co });
     const ini0 = await initiative(plain.admin, plain.orgId);
     const app0 = await t.http.post(`${V}/applications`).set(plain.admin.auth).set(plain.org).set(idem()).send(APP(ini0)).expect(201);
-    expect((await t.http.post(`${V}/applications/${app0.body.id}/request-approval`).set(plain.admin.auth).set(plain.org)).body.error.code).toBe("APPLICANT_REQUIRED");
+    expect((await t.http.post(`${V}/applications/${app0.body.id}/request-approval`).set(plain.admin.auth).set(plain.org)).body.error.code).toBe("CREDIT_LIMIT_REQUIRED");
 
     const a = await approvedApplicant(54);
     const future = await initiative(a.admin, a.orgId, new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10));
