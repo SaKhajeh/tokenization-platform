@@ -10,6 +10,7 @@ import { parse, zUuid } from "./common/zod.js";
 import { CasesService } from "./cases/cases.service.js";
 import { CommentsService } from "./cases/comments.service.js";
 import { LimitsService } from "./cases/limits.service.js";
+import { ReportService } from "./cases/report.service.js";
 import { zIsoDate } from "./common/zod.js";
 
 const zId = z.object({ id: zUuid });
@@ -21,7 +22,7 @@ const zSectionData = z.record(z.unknown()).refine((d) => JSON.stringify(d).lengt
 
 @Controller()
 export class CasesController {
-  constructor(private readonly cases: CasesService, private readonly comments: CommentsService, private readonly limits: LimitsService) {}
+  constructor(private readonly cases: CasesService, private readonly comments: CommentsService, private readonly limits: LimitsService, private readonly report: ReportService) {}
 
   // ------------------------------------------------------------------ applicant
 
@@ -302,6 +303,24 @@ export class CasesController {
   }
 
   // ------------------------------------------------------------------ fund: visit, scoring, approval, limit
+
+  /** §7.6: credit-bureau / Sana inquiry for the company or a director. */
+  @Post("admin/cases/:id/inquiries")
+  @StaffOnly("analyst")
+  inquiry(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(z.object({
+      subject_type: z.enum(["company", "person"]), subject_national_id: z.string().regex(/^\d{10,11}$/), bureau: zText(2, 200), inquiry_date: zIsoDate,
+      result: z.enum(["pass", "fail"]), sana_registered: z.boolean(), description: z.string().max(3000).nullable().optional(), document_id: zUuid.nullable().optional(),
+    }), body);
+    return this.report.addInquiry(req, parse(zId, p).id, b);
+  }
+
+  /** The fund's report (S-18/S-19): pre-filled from the case, with inquiries, red flags, ratios and the analysis sheet. */
+  @Get("admin/cases/:id/report")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  caseReport(@Param() p: unknown) {
+    return this.report.report(parse(zId, p).id);
+  }
 
   @Post("admin/cases/:id/visit")
   @StaffOnly("analyst")

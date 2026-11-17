@@ -6,12 +6,10 @@ import { StepUp } from "./common/stepup.js";
 import { Idempotent } from "./common/idempotency.js";
 import type { AppRequest } from "./common/context.js";
 import { parse, zIsoDate, zUuid } from "./common/zod.js";
-import { CHARGE_POINTS, PricingService } from "./pricing/pricing.service.js";
+import { PricingService } from "./pricing/pricing.service.js";
 import { InvoicesService } from "./invoices/invoices.service.js";
 
 const zId = z.object({ id: zUuid });
-const zCode = z.object({ code: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/, "lower-case code, e.g. credit_scoring") });
-const zRialOrZero = z.string().regex(/^(0|[1-9]\d{0,17})$/, "amount in rials, digits only");
 const zRate = z.string().regex(/^0\.\d{1,6}$/, "rate as a decimal, e.g. 0.056");
 const zBps = z.number().int().min(0).max(10000);
 const zText = (min: number, max: number) => z.string().trim().min(min).max(max);
@@ -20,43 +18,11 @@ const zText = (min: number, max: number) => z.string().trim().min(min).max(max);
 export class PricingController {
   constructor(private readonly pricing: PricingService) {}
 
-  /** Applicants see the prices before they apply (no hidden fees). */
-  @Get("pricing/services")
+  /** Applicants see the fees before they apply (no hidden fees). */
+  @Get("pricing/fees")
   @OrgRoute()
-  publicList() {
-    return this.pricing.publicPriceList();
-  }
-
-  @Get("admin/pricing/services")
-  @StaffOnly("fund_manager", "analyst", "finance_officer", "auditor", "super_admin")
-  list(@Query() query: unknown) {
-    const f = parse(z.object({ include_retired: z.enum(["true", "false"]).optional() }), query);
-    return this.pricing.catalogue({ includeRetired: f.include_retired === "true" });
-  }
-
-  @Put("admin/pricing/services/:code")
-  @StaffOnly("fund_manager")
-  @StepUp()
-  upsert(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
-    const b = parse(
-      z.object({
-        title: zText(2, 120),
-        description: z.string().trim().max(1000).nullable().optional(),
-        amount: zRialOrZero,
-        fund_share_bps: zBps,
-        charge_point: z.enum(CHARGE_POINTS),
-      }),
-      body,
-    );
-    return this.pricing.upsertService(req, parse(zCode, p).code, b);
-  }
-
-  @Post("admin/pricing/services/:code/retire")
-  @HttpCode(200)
-  @StaffOnly("fund_manager")
-  @StepUp()
-  retire(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
-    return this.pricing.retireService(req, parse(zCode, p).code, parse(z.object({ reason: zText(3, 500) }), body).reason);
+  publicFees() {
+    return this.pricing.publicFees();
   }
 
   @Get("admin/pricing/policy")

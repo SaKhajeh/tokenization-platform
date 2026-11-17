@@ -8,10 +8,15 @@ import { AuditService } from "../audit/audit.service.js";
 import { ObjectStorage, STORAGE } from "../integrations/providers.js";
 import { actor, AppRequest } from "../common/context.js";
 
-export const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"] as const;
+/** plan/07 §6a: PDF, JPEG, PNG, HEIC (phone camera), Word and Excel (shown in the viewer as PDF; the original is kept). */
+export const ALLOWED_MIME = [
+  "application/pdf", "image/jpeg", "image/png", "image/heic", "image/heif",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+] as const;
 
 const E = {
-  mime: () => new ApiError(400, "FILE_TYPE_NOT_ALLOWED", "Only PDF, JPEG or PNG files are accepted", "فقط فایل PDF، JPEG یا PNG پذیرفته می‌شود."),
+  mime: () => new ApiError(400, "FILE_TYPE_NOT_ALLOWED", "Accepted: PDF, JPEG, PNG, HEIC, DOCX, XLSX", "فقط فایل PDF، تصویر (JPEG، PNG، HEIC)، Word یا Excel پذیرفته می‌شود."),
   size: (max: number) => new ApiError(400, "FILE_TOO_LARGE", `Max ${max} bytes`, "حجم فایل بیش از حد مجاز است.", { max_bytes: max }),
   notUploaded: () => new ApiError(409, "UPLOAD_NOT_FOUND", "The file has not been uploaded yet", "فایل هنوز بارگذاری نشده است."),
   sizeMismatch: () => new ApiError(409, "UPLOAD_SIZE_MISMATCH", "Uploaded size differs from the declared size", "حجم فایل بارگذاری‌شده با مقدار اعلام‌شده یکسان نیست."),

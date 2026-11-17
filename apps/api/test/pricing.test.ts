@@ -18,11 +18,8 @@ beforeAll(async () => {
 afterAll(async () => t.close());
 
 const V = "/api/v1";
-const SERVICES = [
-  ["credit_scoring", "اعتبارسنجی", "80000000", 10000],
-  ["due_diligence", "بررسی دقیق (DD)", "90000000", 10000],
-  ["guarantee_review", "کارشناسی و استعلام تضامین", "30000000", 7000],
-] as const; // 20,000,000 toman in total
+// D-C13: fees live in the versioned tariff. Financing application fee 20,000,000 toman; platform share 4.5%.
+const TARIFF = { effective_from: "2026-01-01", assessment_fee_tehran: "0", assessment_fee_outside: "0", application_fee: "200000000", servicing_fee_bps: 0, investor_fee_bps: 0, platform_share_bps: 450 };
 
 async function asFm(method: "put" | "post", path: string, body: unknown, s = fm) {
   const su = await stepUp(t, s, method.toUpperCase(), `${V}${path}`, body);
@@ -69,28 +66,19 @@ async function screenedApplication(n: number) {
 
 const invoiceFor = async (appId: string) => (await t.db.query(`select * from invoices where linked_id = $1 order by issued_at desc limit 1`, [appId])).rows[0];
 
-describe("fund pricing settings (D25, D26)", () => {
-  it("without a price list, screening goes straight to credit assessment", async () => {
+describe("fund pricing settings (D26, D-C13)", () => {
+  it("with no application fee in the tariff, screening goes straight to credit assessment", async () => {
     const a = await screenedApplication(71);
     expect(a.status).toBe("credit_assessment");
     expect(await invoiceFor(a.id)).toBeUndefined();
   });
 
   it("only the fund manager edits prices and rates, always with step-up, and every version is kept", async () => {
-    const body = { title: "اعتبارسنجی", amount: "80000000", fund_share_bps: 10000, charge_point: "after_screening" };
-    expect((await t.http.put(`${V}/admin/pricing/services/credit_scoring`).set(an.auth).send(body)).status).toBe(403);
-    expect((await t.http.put(`${V}/admin/pricing/services/credit_scoring`).set(fm.auth).send(body)).body.error.code).toBe("STEP_UP_REQUIRED");
-    for (const [code, title, amount, share] of SERVICES) {
-      const r = await asFm("put", `/admin/pricing/services/${code}`, { title, amount, fund_share_bps: share, charge_point: "after_screening" });
-      expect(r.status).toBe(200);
-    }
-    // price change → version 2; version 1 kept, retired
-    const v2 = await asFm("put", `/admin/pricing/services/credit_scoring`, { title: "اعتبارسنجی", amount: "80000000", fund_share_bps: 10000, charge_point: "after_screening", description: "شامل استعلام بانکی" });
-    expect(v2.body.version).toBe(2);
-    const all = await t.http.get(`${V}/admin/pricing/services?include_retired=true`).set(fin.auth).expect(200);
-    expect(all.body.filter((s: any) => s.code === "credit_scoring").map((s: any) => [s.version, s.active])).toEqual([[2, true], [1, false]]);
-    const audit = await t.db.query(`select action from audit_log where action like 'pricing.%'`);
-    expect(audit.rows.map((r: any) => r.action)).toEqual(expect.arrayContaining(["pricing.service_created", "pricing.service_updated"]));
+    expect((await t.http.put(`${V}/admin/tariffs`).set(an.auth).send(TARIFF)).status).toBe(403);
+    expect((await t.http.put(`${V}/admin/tariffs`).set(fm.auth).send(TARIFF)).body.error.code).toBe("STEP_UP_REQUIRED");
+    expect((await asFm("put", `/admin/tariffs`, TARIFF)).body).toMatchObject({ version: 1, application_fee: "200000000" });
+    // the retired per-service price list is gone
+    expect((await t.http.get(`${V}/admin/pricing/services`).set(fm.auth)).status).toBe(404);
 
     // rate policy: investor rate must stay below the applicant rate by the minimum spread
     const bad = await asFm("put", `/admin/pricing/policy`, { rate_basis: "monthly", default_applicant_rate: "0.04", default_investor_rate: "0.045", waterfall_order: "fund_first", vat_bps: 0 });
@@ -111,15 +99,15 @@ describe("fund pricing settings (D25, D26)", () => {
     expect(notMultiple.body.error.code).toBe("AMOUNT_NOT_MULTIPLE");
   });
 
-  it("applicants see the price list before applying, without the internal split", async () => {
+  it("applicants see the fees before applying, without the internal split", async () => {
     const a = await approvedOrg(t, 72, { compliance: co });
-    const r = await t.http.get(`${V}/pricing/services`).set(a.admin.auth).set(a.org).expect(200);
-    expect(r.body.services.map((s: any) => s.amount)).toEqual(["80000000", "90000000", "30000000"]);
-    expect(r.body.services[0].fund_share_bps).toBeUndefined();
+    const r = await t.http.get(`${V}/pricing/fees`).set(a.admin.auth).set(a.org).expect(200);
+    expect(r.body).toMatchObject({ application_fee: "200000000", tariff_version: 1, vat_bps: 0 });
+    expect(r.body.platform_share_bps).toBeUndefined();
   });
 });
 
-describe("assessment invoice (D25)", () => {
+describe("application fee invoice (D-C13)", () => {
   it("screening pass issues the invoice; assessment starts only after the applicant pays", async () => {
     const a = await screenedApplication(73);
     expect(a.status).toBe("awaiting_payment");
@@ -127,9 +115,9 @@ describe("assessment invoice (D25)", () => {
     expect(inv).toMatchObject({ status: "issued", subtotal: "200000000", total: "200000000", fund_share: "191000000", platform_share: "9000000", policy_version: 1 });
     expect(inv.invoice_no).toMatch(/^INV-14\d\d-\d{5}$/);
 
-    // the applicant sees the invoice with its lines, and was told how much to pay
+    // the applicant sees the invoice and was told how much to pay
     const mine = await t.http.get(`${V}/invoices/${inv.id}`).set(a.admin.auth).set(a.org).expect(200);
-    expect(mine.body.lines.map((l: any) => l.code)).toEqual(["credit_scoring", "due_diligence", "guarantee_review"]);
+    expect(mine.body.total).toBe("200000000");
     expect(mine.body.fund_share).toBeUndefined();
     const n = await t.http.get(`${V}/notifications`).set(a.admin.auth).expect(200);
     const note = n.body.items.find((x: any) => x.event_key === "application.payment_required");

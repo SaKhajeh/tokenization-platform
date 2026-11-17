@@ -47,6 +47,7 @@ import { CasesController } from "./cases.controllers.js";
 import { CasesService } from "./cases/cases.service.js";
 import { CommentsService } from "./cases/comments.service.js";
 import { LimitsService } from "./cases/limits.service.js";
+import { ReportService } from "./cases/report.service.js";
 import { TicketsService } from "./tickets/tickets.service.js";
 import { TicketsController } from "./tickets.controllers.js";
 
@@ -107,6 +108,7 @@ export class AppModule {
         CasesService,
         CommentsService,
         LimitsService,
+        ReportService,
         TicketsService,
         InvoicesService,
       ],

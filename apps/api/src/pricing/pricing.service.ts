@@ -1,10 +1,11 @@
 /**
- * Fund pricing settings (master plan D25–D27), edited by the fund manager in the service app:
- *   - the service price list (credit scoring, due diligence, …) that applicants pay for;
+ * Fund pricing settings (master plan D25–D27, plan/07 §6d), edited by the fund manager in the service app:
+ *   - fees live in the versioned fee tariff (cases/fees.ts, LimitsService.setTariff): the assessment fee at case
+ *     submission and the financing application fee charged when an application passes screening (D-C13);
  *   - the rate policy: default applicant rate, default investor rate, minimum spread, rate basis, repayment order, VAT.
  *
  * Both are versioned and never edited in place: a change adds a new version and the audit log keeps before/after.
- * Invoices record the policy version they were issued under; series terms will record theirs (M-D).
+ * The per-service price list of D25 (service_catalogue) is retired: the tariff replaced it (doc 07 §6d).
  */
 import { Inject, Injectable } from "@nestjs/common";
 import {
@@ -12,20 +13,13 @@ import {
 } from "@tp/domain";
 import { DB, Db, Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
-import { ApiError, Errors } from "../common/errors.js";
+import { ApiError } from "../common/errors.js";
 import { actor, AppRequest } from "../common/context.js";
 import { uuidv7 } from "../common/ids.js";
+import { currentTariff } from "../cases/fees.js";
 
 export const CHARGE_POINTS = ["after_screening"] as const;
 export type ChargePoint = (typeof CHARGE_POINTS)[number];
-
-export interface ServiceInput {
-  title: string;
-  description?: string | null;
-  amount: string; // rials
-  fund_share_bps: number;
-  charge_point: ChargePoint;
-}
 
 export interface PolicyInput {
   rate_basis: RateBasis;
@@ -54,12 +48,6 @@ const err = {
   multiple: () => new ApiError(422, "AMOUNT_NOT_MULTIPLE", "Amount must be a multiple of the face value", "مبلغ باید مضربی از ارزش اسمی هر واحد باشد."),
 };
 
-const serviceView = (r: any) => ({
-  id: r.id, code: r.code, version: r.version, title: r.title, description: r.description, amount: String(r.amount),
-  fund_share_bps: r.fund_share_bps, charge_point: r.charge_point, active: r.active, created_by: r.created_by, created_at: r.created_at,
-  retired_at: r.retired_at,
-});
-
 const policyView = (r: any) =>
   r && {
     version: r.version, rate_basis: r.rate_basis, default_applicant_rate: String(r.default_applicant_rate), default_investor_rate: String(r.default_investor_rate),
@@ -72,54 +60,17 @@ const dec = (s: string) => s.replace(/0+$/, "").replace(/\.$/, "");
 export class PricingService {
   constructor(@Inject(DB) private readonly db: Db, private readonly audit: AuditService) {}
 
-  // ------------------------------------------------------------------ price list
-
-  async catalogue(opts: { includeRetired?: boolean } = {}) {
-    const r = await this.db.query(
-      `select * from service_catalogue ${opts.includeRetired ? "" : "where active"} order by code, version desc`,
-    );
-    return r.rows.map(serviceView);
-  }
-
-  /** What an applicant sees before applying: active services with prices (no internal split). */
-  async publicPriceList() {
+  /** What an applicant sees before applying: the current fees (no internal split). */
+  async publicFees() {
+    const t = await currentTariff(this.db);
     const p = await this.policy();
-    const rows = (await this.db.query(`select code, title, description, amount, charge_point from service_catalogue where active order by code`)).rows;
     return {
       vat_bps: p?.vat_bps ?? 0,
-      services: rows.map((r: any) => ({ code: r.code, title: r.title, description: r.description, amount: String(r.amount), charge_point: r.charge_point })),
+      assessment_fee_tehran: t ? String(t.assessment_fee_tehran) : "0",
+      assessment_fee_outside: t ? String(t.assessment_fee_outside) : "0",
+      application_fee: t ? String(t.application_fee) : "0",
+      tariff_version: t?.version ?? null,
     };
-  }
-
-  /** Creates a service or replaces its price/terms with a new version. */
-  async upsertService(req: AppRequest, code: string, input: ServiceInput) {
-    return this.db.tx(async (q) => {
-      const cur = (await q.query(`select * from service_catalogue where code = $1 and active for update`, [code])).rows[0];
-      const last = (await q.query(`select coalesce(max(version), 0)::int as v from service_catalogue where code = $1`, [code])).rows[0].v;
-      if (cur) await q.query(`update service_catalogue set active = false, retired_by = $2, retired_at = now() where id = $1`, [cur.id, req.user!.id]);
-      const row = (
-        await q.query(
-          `insert into service_catalogue (id, code, version, title, description, amount, fund_share_bps, charge_point, created_by)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
-          [uuidv7(), code, last + 1, input.title, input.description ?? null, input.amount, input.fund_share_bps, input.charge_point, req.user!.id],
-        )
-      ).rows[0];
-      await this.audit.append(q, {
-        ...actor(req), action: cur ? "pricing.service_updated" : "pricing.service_created", entityType: "service", entityId: row.id,
-        before: cur ? serviceView(cur) : undefined, after: serviceView(row),
-      });
-      return serviceView(row);
-    });
-  }
-
-  async retireService(req: AppRequest, code: string, reason: string) {
-    return this.db.tx(async (q) => {
-      const cur = (await q.query(`select * from service_catalogue where code = $1 and active for update`, [code])).rows[0];
-      if (!cur) throw Errors.notFound("Service");
-      await q.query(`update service_catalogue set active = false, retired_by = $2, retired_at = now() where id = $1`, [cur.id, req.user!.id]);
-      await this.audit.append(q, { ...actor(req), action: "pricing.service_retired", entityType: "service", entityId: cur.id, before: serviceView(cur), after: { reason } });
-      return { code, active: false };
-    });
   }
 
   // ------------------------------------------------------------------ rate policy
@@ -177,30 +128,24 @@ export class PricingService {
 
   // ------------------------------------------------------------------ invoices (issued inside the caller's transaction)
 
-  /** Issues an invoice from the active price list for a charge point. Returns null when nothing is charged. */
+  /** The financing application fee from the current tariff (D-C13). Returns null when it is zero. */
   async issueInvoice(q: Queryable, i: { orgId: string; linkedType: string; linkedId: string; chargePoint: ChargePoint; actorId: string | null; today: string }) {
-    const services = (await q.query(`select * from service_catalogue where active and charge_point = $1 and amount > 0 order by code`, [i.chargePoint])).rows;
-    if (!services.length) return null;
+    const t = await currentTariff(q);
+    const amount = BigInt(t?.application_fee ?? 0);
+    if (amount === 0n) return null;
     const p = await this.policy(q);
     const vatBps = p?.vat_bps ?? 0;
-    const t = invoiceTotals(services.map((s: any) => ({ code: s.code, amount: BigInt(s.amount), fundShareBps: s.fund_share_bps })), vatBps);
+    const tot = invoiceTotals([{ code: "application_fee", amount, fundShareBps: 10000 - t.platform_share_bps }], vatBps);
     const n = Number((await q.query(`select nextval('invoice_no_seq') as n`)).rows[0].n);
     const no = `INV-${jalaliYearOf(i.today)}-${String(n).padStart(5, "0")}`;
     const id = uuidv7();
     await q.query(
       `insert into invoices (id, invoice_no, org_id, linked_type, linked_id, charge_point, subtotal, vat_bps, vat, total, fund_share, platform_share, policy_version, issued_by)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-      [id, no, i.orgId, i.linkedType, i.linkedId, i.chargePoint, t.subtotal.toString(), vatBps, t.vat.toString(), t.total.toString(),
-        t.fundShare.toString(), t.platformShare.toString(), p?.version ?? null, i.actorId],
+      [id, no, i.orgId, i.linkedType, i.linkedId, i.chargePoint, tot.subtotal.toString(), vatBps, tot.vat.toString(), tot.total.toString(),
+        tot.fundShare.toString(), tot.platformShare.toString(), t.version, i.actorId],
     );
-    let line = 0;
-    for (const s of services) {
-      await q.query(
-        `insert into invoice_lines (invoice_id, line_no, service_id, code, title, amount, fund_share_bps) values ($1,$2,$3,$4,$5,$6,$7)`,
-        [id, ++line, s.id, s.code, s.title, String(s.amount), s.fund_share_bps],
-      );
-    }
-    return { id, invoice_no: no, total: t.total };
+    return { id, invoice_no: no, total: tot.total };
   }
 }
 

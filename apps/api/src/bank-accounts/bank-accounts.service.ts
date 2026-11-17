@@ -17,6 +17,7 @@ import { uuidv7 } from "../common/ids.js";
 import { normalizeDigits } from "../common/validators.js";
 import { closeWorkflowTasks, staffTask } from "../common/workflow.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
+import { CasesService } from "../cases/cases.service.js";
 
 /** Normalises and checks an Iranian IBAN (شبا): IR + 24 digits, ISO 13616 mod-97 check. */
 export function normalizeIban(input: string): string | null {
@@ -59,6 +60,7 @@ export class BankAccountsService {
     @Inject(REGISTRY) private readonly registry: RegistryProvider,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly cases: CasesService,
   ) {}
 
   async list(req: AppRequest) {
@@ -93,6 +95,7 @@ export class BankAccountsService {
             String(this.cfg.bank.coolingOffHours), matched && !hasDefault, req.user!.id],
         )
       ).rows[0];
+      if (matched) await this.cases.refreshPrefill(q, orgId, req.user!.id); // §2a
       if (!matched) {
         await staffTask(q, {
           title: `بررسی حساب بانکی: ${org.legal_name}`,
@@ -153,6 +156,7 @@ export class BankAccountsService {
         )
       ).rows[0];
       await closeWorkflowTasks(q, "bank_account", id, req.user!.id);
+      if (input.approved) await this.cases.refreshPrefill(q, a.org_id, req.user!.id); // §2a
       await this.notifications.notify(q, {
         to: { orgId: a.org_id, orgRoles: ["org_admin"] }, event: input.approved ? "bank_account.verified" : "bank_account.rejected",
         params: { iban_tail: `…${a.iban.slice(-4)}`, reason: input.reason }, dedupeKey: `bank_account.review:${id}`,

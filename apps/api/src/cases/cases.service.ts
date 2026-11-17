@@ -67,13 +67,9 @@ export class CasesService {
 
   // ================================================================== opening and pre-fill (§2a)
 
-  /** Opens the org's case if it wants financing and has submitted KYB. Idempotent. Runs inside the caller's transaction. */
-  async openIfEligible(q: Queryable, orgId: string, actorId: string | null) {
-    const org = (await q.query(`select * from orgs where id = $1`, [orgId])).rows[0];
-    if (!org?.wants_financing || org.kyb_status === "not_started") return null;
-    const existing = (await q.query(`select id from cases where org_id = $1`, [orgId])).rows[0];
-    if (existing) return existing.id as string;
-
+  /** What registration knows, shaped as case-form sections (§2a). */
+  private async buildPrefill(q: Queryable, org: any, actorId: string | null) {
+    const orgId = org.id;
     const kyb = (await q.query(`select * from kyb_cases where org_id = $1 order by version desc limit 1`, [orgId])).rows[0];
     const snap = kyb ? (await q.query(`select data from legal_identity_snapshots where id = $1`, [kyb.snapshot_id])).rows[0]?.data : null;
     const rep = actorId ? (await q.query(`select full_name, mobile from users where id = $1`, [actorId])).rows[0] : null;
@@ -98,6 +94,51 @@ export class CasesService {
       }),
       banks_facilities: banks.length ? { banks: banks.map((b: any) => strip({ id: b.id, name: b.bank_name, account_no: b.iban })) } : {},
     };
+    return prefill;
+  }
+
+  /**
+   * §2a: registration changed (re-KYB submitted, a bank account verified). Fields the applicant never edited — their value still
+   * equals the old pre-fill — take the new value; edited fields stay as they are. Only while the case is editable.
+   */
+  async refreshPrefill(q: Queryable, orgId: string, actorId: string | null = null) {
+    const c = (await q.query(`select id, state from cases where org_id = $1 for update`, [orgId])).rows[0];
+    if (!c || !editable(c.state)) return [];
+    const org = (await q.query(`select * from orgs where id = $1`, [orgId])).rows[0];
+    const next = await this.buildPrefill(q, org, null); // the representative stays whoever opened the case
+    const rows = (await q.query(`select section, data, prefill from case_sections where case_id = $1`, [c.id])).rows;
+    const changed: string[] = [];
+    for (const r of rows) {
+      const np = (next as Record<string, Record<string, unknown> | undefined>)[r.section] ?? {};
+      const data = { ...(r.data ?? {}) }, prefill = { ...(r.prefill ?? {}) };
+      let touched = false;
+      for (const [k, v] of Object.entries(np)) {
+        if (JSON.stringify(prefill[k]) === JSON.stringify(v)) continue;
+        if (data[k] === undefined || JSON.stringify(data[k]) === JSON.stringify(prefill[k])) {
+          data[k] = v;
+          changed.push(`${r.section}.${k}`);
+        }
+        prefill[k] = v;
+        touched = true;
+      }
+      if (touched) await q.query(`update case_sections set data = $3, prefill = $4 where case_id = $1 and section = $2`, [c.id, r.section, JSON.stringify(data), JSON.stringify(prefill)]);
+    }
+    if (changed.length) await this.audit.append(q, { actorType: actorId ? "user" : "system", actorUserId: actorId, orgId, action: "case.prefill_refreshed", entityType: "case", entityId: c.id, after: { fields: changed } });
+    return changed;
+  }
+
+  /** Opens the org's case if it wants financing and has submitted KYB. Idempotent. Runs inside the caller's transaction. */
+  async openIfEligible(q: Queryable, orgId: string, actorId: string | null) {
+    const org = (await q.query(`select * from orgs where id = $1`, [orgId])).rows[0];
+    if (!org?.wants_financing || org.kyb_status === "not_started") return null;
+    const existing = (await q.query(`select id from cases where org_id = $1`, [orgId])).rows[0];
+    if (existing) {
+      await this.refreshPrefill(q, orgId, actorId);
+      return existing.id as string;
+    }
+
+    const kyb = (await q.query(`select * from kyb_cases where org_id = $1 order by version desc limit 1`, [orgId])).rows[0];
+    const prefill = await this.buildPrefill(q, org, actorId);
 
     const id = uuidv7();
     const n = Number((await q.query(`select nextval('case_no_seq') as n`)).rows[0].n);
