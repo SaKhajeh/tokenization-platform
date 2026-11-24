@@ -35,4 +35,4 @@ A-01/02 welcome and phone entry · A-04/05/07 identity, create org, org details 
 
 - A-42 (Figma): align the side-by-side inputs to the same top edge.
 - Success/warning chip text colours were darkened on the canvas (#166534 / #92400E) to meet WCAG AA at 12 px; apply the same to the Figma tokens before handoff.
-- PRD (02) and UX spec (05) still mention the A–D credit grade; 07 §9 supersedes them.
+- ~~PRD (02) and UX spec (05) still mention the A–D credit grade~~ — aligned with 07 on 2026-11-24. Frames drawn before that (A-41 Issuer profile, "issuer" labels on A-44/A-45, the credit grade on A-11) still show the old wording and should be relabelled in the next design round.

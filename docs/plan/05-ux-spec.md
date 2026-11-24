@@ -1,6 +1,8 @@
 # UX Spec v1 — Tokenization Platform (Phase 1)
 
-_Date: 2026-11-04 · Companion to 02-prd-v1.md (FR IDs) and 04-integrations-jibit.md · Product language: Farsi (RTL), Jalali dates, Persian digits · Figma: https://www.figma.com/design/9pHyREdF55vvZKEEUHN1wE_
+_Date: 2026-11-04, updated 2026-11-24 · Companion to 02-prd-v1.md (FR IDs) and 04-integrations-jibit.md · Product language: Farsi (RTL), Jalali dates, Persian digits · Figma: https://www.figma.com/design/9pHyREdF55vvZKEEUHN1wE_
+
+_Updated 2026-11-24: aligned with D14 (the fund is the only issuer; companies are applicants), doc 07 (credit case and credit limit instead of an issuer profile and a credit grade; screens A-05b, A-0H variant, A-69–A-74, S-16–S-19), D16 (project companies see only the amount raised), D25–D26 (fee tariff, two rates) and D-C21 (no arrangement fee). The case screens themselves are specified in doc 07 §11 and drawn per doc 06. Farsi terms marked “to confirm” are proposals, not yet on the canvas._
 
 ---
 
@@ -9,8 +11,8 @@ _Date: 2026-11-04 · Companion to 02-prd-v1.md (FR IDs) and 04-integrations-jibi
 1. Trust before beauty. Every number shows its source and status: "تأیید شده", "در انتظار", a verifiable on-chain link. No hidden fees, and no state is ever ambiguous.
 2. Money actions are never one tap. Each one goes through Review → Confirm (OTP) → Receipt. Destructive or irreversible actions get a summary sheet that spells out what will happen.
 3. The next step is always obvious. Home shows one primary "next action" (finish KYB, verify the bank account, deposit, approve a subscription…). The task inbox collects everything else.
-4. Org-aware, role-aware. The same app adapts to the active organisation type (investor / issuer / both) and the member's role (admin / preparer / approver / viewer). Users never see actions they can't take; disabled states explain why.
-5. Mobile-first, desktop-complete. The investor/issuer app is designed at 390 px and scales to tablet and desktop with a 2-column layout. The service app is desktop-first (1440 px) and usable on a tablet.
+4. Org-aware, role-aware. The same app adapts to what the active organisation does (invest / get financing / both, chosen at registration — A-05b) and the member's role (admin / preparer / approver / viewer). Users never see actions they can't take; disabled states explain why.
+5. Mobile-first, desktop-complete. The investor/applicant app is designed at 390 px and scales to tablet and desktop with a 2-column layout. The service app is desktop-first (1440 px) and usable on a tablet.
 6. Farsi-native. Full RTL mirroring (navigation, progress, chevrons, charts). Persian digits in the UI. Amounts are shown in toman with rial available in tooltips and exports (configurable). Jalali dates everywhere.
 7. Plain language. No crypto jargon in the investor UI. A token is a "واحد" (unit); the digital ID is "شناسه دیجیتال"; "blockchain record" becomes "سابقه ثبت‌شده عمومی" with a "مشاهده در بلاک‌چین" link.
 
@@ -23,18 +25,18 @@ _Date: 2026-11-04 · Companion to 02-prd-v1.md (FR IDs) and 04-integrations-jibi
 خانه | فرصت‌های سرمایه‌گذاری | تأمین مالی برای کسب‌وکارها | درباره صندوق | راهنما و پرسش‌ها | ورود / ثبت‌نام
 
 - Home: hero ("تأمین مالی شفاف و قابل‌ردیابی برای طرح‌های فناورانه"), live stats, open and upcoming offerings, how it works (3 steps), trust strip (fund licence, guarantees, public ledger).
-- Offering detail (public view): summary, terms, credit grade, guarantee summary, public documents, progress. Gated documents show a lock with "برای مشاهده، احراز هویت سازمان را تکمیل کنید".
+- Offering detail (public view): summary, terms (investor rate), "credit limit checked by the fund" (no grade), the "assessed by the fund before onboarding" label where it applies (D23), collateral summary, public documents, progress. Gated documents show a lock with "برای مشاهده، احراز هویت سازمان را تکمیل کنید".
 
-### 2.2 App (investor + issuer), PWA
+### 2.2 App (investor + applicant), PWA
 
 Header: org switcher (org name + avatar, ▾), notifications bell, tasks badge.
 
 Bottom navigation (the first item sits on the right, RTL):
 
-| Investor org | Issuer org | Both |
+| Investor org | Applicant org | Both |
 |---|---|---|
 | خانه | خانه | خانه |
-| فرصت‌ها | تأمین مالی (applications & series) | فرصت‌ها |
+| فرصت‌ها | تأمین مالی (credit case, applications & series) | فرصت‌ها |
 | سبد من (portfolio) | تعهدات (obligations) | سبد من |
 | کیف پول (balance, deposit, withdraw) | کیف پول | تأمین مالی |
 | بیشتر | بیشتر | بیشتر (includes کیف پول) |
@@ -51,11 +53,13 @@ Right sidebar, with sections shown according to the staff member's roles:
 
 صف‌ها      ← احراز هویت (KYB) · حساب‌های بانکی · واریزهای معلق · برداشت‌ها
 
-طرح‌ها و درخواست‌ها  ← pipeline (kanban) · ارزیابی اعتبار · بررسی دقیق (DD) · کمیته
+پرونده‌های اعتباری ← cases queue (S-16) · بررسی مدارک (S-17) · ارقام مالی (S-18) · محاسبه حد اعتباری (S-19)
+
+طرح‌ها و درخواست‌ها  ← pipeline (kanban) · بررسی حد (limit check, S-11) · بررسی دقیق (DD) · کمیته [DD and committee: D-C22]
 
 سری‌ها     ← در حال پذیره‌نویسی · فعال · سررسید · نکول
 
-خزانه      ← پرداخت به ناشر · اجرای پرداخت سود · انتقال‌ها · موجودی و مغایرت‌گیری
+خزانه      ← پرداخت به متقاضی (disbursement) · اجرای پرداخت سود · انتقال‌ها · موجودی و مغایرت‌گیری
 
 توکن‌سازی و بلاک‌چین ← صف توکن‌سازی · تراکنش‌ها · مغایرت دفتر/زنجیره · کیف کارمزد
 
@@ -98,9 +102,9 @@ After approval: a celebration screen, "شناسه دیجیتال سازمان ش
 
 A-10 Offerings → A-11 Offering detail → A-12 Choose units → A-13 Review & consents → A-14 Send for approval / Confirm (OTP) → A-15 Receipt
 
-- A-11 sections: key figures (rate, duration, maturity in Jalali, face value, minimum), progress bar + countdown, issuer card, guarantee & credit grade, payout example ("برای ۱۰ واحد در سررسید دریافت می‌کنید: …"), documents (lock icons where gated), under-subscription rule explained in one line.
+- A-11 sections: key figures (investor rate, duration, maturity in Jalali, face value, minimum), progress bar + countdown, issuer card (the fund) and project card (project company), collateral and "credit limit checked by the fund", the pre-assessment label where it applies (D23), payout example ("برای ۱۰ واحد در سررسید دریافت می‌کنید: …"), documents (lock icons where gated), under-subscription rule explained in one line.
 - A-12: units stepper + amount + "موجودی کافی/ناکافی" + projected payout. If the balance is short: "واریز کنید" shortcut.
-- A-13: three consent checkboxes, each with a "مشاهده" link (terms, risk disclosure, issuer visibility). The submit button is disabled until all are ticked.
+- A-13: three consent checkboxes, each with a "مشاهده" link (terms, risk disclosure incl. the repayment order D27, sharing with the fund D16). The submit button is disabled until all are ticked.
 - Preparer/approver: a preparer sees "ارسال برای تأیید" → the approver gets a task + push; in single-user mode → direct OTP confirm.
 
 ### F4 — Portfolio & payout
@@ -114,12 +118,16 @@ A-10 Offerings → A-11 Offering detail → A-12 Choose units → A-13 Review & 
 
 A-22 Withdraw amount → A-23 Choose verified account → A-24 Review → OTP → A-25 Status tracker The tracker steps are ثبت شد → تأیید سازمان → بررسی مالی → ارسال به بانک (پایا/ساتنا/داخلی, estimated time) → واریز شد, plus a receipt link.
 
-### F6 — Issuer: apply for funding
+### F6 — Applicant: credit case, then financing
 
-A-40 Funding home → A-41 Issuer profile (once) → A-42 New application wizard (5 steps: طرح · مبلغ و شرایط · منبع بازپرداخت · تضامین پیشنهادی · مدارک) → A-43 Review & submit → A-44 Application tracker
+Registration with the financing purpose (A-05b) → KYB → A-0H (applicant variant: next action and the 6-step path) → A-69 Case intro → A-70 Case home → A-71a / A-71 form sections, A-72 financials, A-73 documents, request letter, assessment fee → submit → fixes for returned items → A-74 Credit limit result (doc 07 §2a, §11) → "درخواست تأمین مالی" → A-40 Funding home → A-42 New application wizard (5 steps: طرح · مبلغ و مدت · منبع بازپرداخت · تضامین پیشنهادی · مدارک) → A-43 Review & submit → A-44 Application tracker
 
-- A-44: a stage tracker (ارسال → غربال → ارزیابی اعتباری → بررسی دقیق → کمیته → شرایط نهایی → امضا → توکن‌سازی → پذیره‌نویسی), current stage highlighted, open questions/tasks from the fund, decision + conditions, and "امضای دیجیتال شرایط" (Jibit signing link).
-- A-45 Series dashboard (issuer): raised/target, investors list (D16), obligations calendar, the repayment payment ID, report-submission tasks.
+- A-41 Issuer profile is **removed** (FR-ISS-1 replaced by the credit case).
+- A-42 "مبلغ و مدت": the binding amount (within the remaining limit, shown) and the duration; rates are not proposed by the applicant (set from the fund's rate policy at the terms stage, D26).
+- Fees: the assessment fee before case submission and the application fee after screening, each with an invoice and payment from the balance (D25, D-C13); no arrangement fee.
+
+- A-44: a stage tracker (ارسال → غربال → پرداخت کارمزد → بررسی حد اعتباری → [بررسی دقیق → کمیته: D-C22] → شرایط نهایی → امضای قرارداد تأمین مالی → توکن‌سازی → پذیره‌نویسی), current stage highlighted, open questions/tasks from the fund, decision + conditions, and "امضای دیجیتال قرارداد" (Jibit signing link for the financing contract, D21).
+- A-45 Series dashboard (applicant): **amount raised / target only — no investor list (D16)**, the applicant rate and amount due, obligations calendar, the repayment payment ID, report-submission tasks.
 
 ### F7 — Tasks & approvals (everyone)
 
@@ -127,7 +135,7 @@ A-50 Tasks inbox (tabs: برای من · برای نقش من · انجام‌ش
 
 ### F8 — Staff: application review → committee → listing
 
-S-10 Pipeline (kanban by stage) → S-11 Application workspace (tabs: خلاصه · غربال · اعتبارسنجی · DD · تضامین · شرایط · تاریخچه) → S-12 Committee session (agenda + vote panel) → S-13 Terms & schedule preview → S-14 Tokenisation queue (two-party approval) → S-15 Series control (open/close/issue/disburse/payout)
+S-16 Cases queue → S-17 Document review → S-18 Verified financial figures → S-19 Credit limit calculation → fund manager approval (doc 07) ; S-10 Pipeline (kanban by stage) → S-11 Application workspace (tabs: خلاصه · غربال · بررسی حد اعتباری (Ra, Re, project ceiling) · DD · تضامین · شرایط (both rates, spread) · تاریخچه) → S-12 Committee session (agenda + vote panel) → S-13 Terms & schedule preview → S-14 Tokenisation queue (two-party approval) → S-15 Series control (open/close/issue/disburse/payout)
 
 ### F9 — Staff: treasury & reconciliation
 
@@ -152,7 +160,8 @@ S-20 Deposits needing review (to-be-decided) → S-21 Withdrawals queue → S-22
 | A-07 | Organisation details (auto-filled) | org_admin | FR-KYB-1,3 |
 | A-08 | Signatories & members | org_admin | FR-KYB-2, FR-ORG-6 |
 | A-09 | Bank accounts + add Sheba | org_admin | FR-BANK |
-| A-0H ✅ | Home (dashboard) | all | — |
+| A-05b | Registration purpose (invest / financing) | org_admin | FR-ORG-2 |
+| A-0H ✅ | Home (dashboard; applicant variant with the next action and the 6-step path) | all | — |
 | A-10 ✅ | Offerings list (filters: باز · به‌زودی · تکمیل‌شده) | all | FR-OFF-1 |
 | A-11 ✅ | Offering detail | all | FR-OFF-1,2 |
 | A-12 | Choose units | preparer+ | FR-SUB-1 |
@@ -166,14 +175,15 @@ S-20 Deposits needing review (to-be-decided) → S-21 Withdrawals queue → S-22
 | A-30 | Portfolio | all | — |
 | A-31 ✅ | Holding detail + schedule | all | FR-SER-3 |
 | A-32 | Digital ID | all | FR-WAL-3 |
-| A-40 | Funding home (issuer) | issuer | FR-ISS |
-| A-41 | Issuer profile | issuer admin | FR-ISS-1 |
-| A-42 | Application wizard (5 steps) | issuer preparer | FR-APP-1 |
-| A-43 | Review & submit | issuer approver | FR-APP-2 |
-| A-44 ✅ | Application tracker | issuer | FR-APP-4 |
-| A-45 | Issuer series dashboard + investors | issuer | FR-CLS-5 |
-| A-46 | Obligations & repayment | issuer | FR-PAY-1,2 |
-| A-47 | Submit report / material event | issuer | FR-MON |
+| A-40 | Funding home (applicant) | applicant | FR-APP |
+| ~~A-41~~ | ~~Issuer profile~~ — removed; replaced by the credit case (A-69–A-74) | — | FR-ISS-1 |
+| A-42 | Application wizard (5 steps) | applicant preparer | FR-APP-1 |
+| A-43 | Review & submit | applicant approver | FR-APP-2 |
+| A-44 ✅ | Application tracker | applicant | FR-APP-4 |
+| A-45 | Series dashboard (amount raised only, D16) | applicant | FR-CLS-5 |
+| A-46 | Obligations & repayment (applicant rate) | applicant | FR-PAY-1,2 |
+| A-47 | Submit report / material event | applicant | FR-MON |
+| A-69 … A-74 ✅ | Credit case: intro, home, form, financials, documents, credit limit result | applicant | FR-ISS-1 (doc 07 §11) |
 | A-50 ✅ | Tasks inbox | all | FR-TASK |
 | A-51 | Task detail | all | FR-TASK |
 | A-60 | Members & roles + invite | org_admin | FR-ORG-3 |
@@ -189,25 +199,26 @@ S-20 Deposits needing review (to-be-decided) → S-21 Withdrawals queue → S-22
 | S-01 | Dashboard (queues, KPIs, alerts) | all staff |
 | S-02 ✅ | KYB queue + case review (Jibit checks side-by-side) | compliance |
 | S-03 | Bank account exceptions | compliance |
+| S-16 … S-19 ✅ | Credit cases: queue, document review, verified figures, credit limit calculation | analyst, technical expert, fund manager |
 | S-10 ✅ | Applications pipeline (kanban) | analyst, fund manager |
-| S-11 | Application workspace (tabs) | analyst, expert (scoped) |
+| S-11 ✅ | Application workspace — limit check (redrawn 2026-11-15) | analyst, expert (scoped) |
 | S-12 | Committee session & voting | committee, fund manager |
 | S-13 | Terms & schedule editor/preview | analyst, fund manager |
 | S-14 | Tokenisation queue (two-party approval) | tokenisation, fund manager |
 | S-15 | Series control centre | fund manager, finance |
 | S-20 | Deposits review (to-be-decided) | finance, compliance |
-| S-21 | Withdrawals & disbursements queue | finance, fund manager |
+| S-21 | Withdrawals & disbursements (to project companies) queue | finance, fund manager |
 | S-22 | Payout run | finance, fund manager |
 | S-23 | Reconciliation & treasury (Jibit balance, limits, fee balance, gas) | finance, tokenisation |
 | S-24 | Chain transactions | tokenisation |
 | S-30 | Organisations & users | compliance, super admin |
 | S-40 | Reports | all (by role) |
-| S-50 | Config (rules, scorecard, guarantee matrix, fees, templates) | fund manager, super admin |
+| S-50 | Config (rules, scoring method, fee tariff, rate policy, templates) | fund manager, super admin |
 | S-60 | Audit log | auditor, super admin |
 
 #### Public site (W-)
 
-W-01 Home · W-02 Offerings · W-03 Offering detail · W-04 Raise funds (for issuers) · W-05 How it works / FAQ · W-06 About the fund · W-07 Legal pages.
+W-01 Home · W-02 Offerings · W-03 Offering detail · W-04 Apply for financing (for applicants; public fee tariff) · W-05 How it works / FAQ · W-06 About the fund · W-07 Legal pages.
 
 ---
 
@@ -276,13 +287,17 @@ Built in Figma: Button (Primary / Secondary / Outline / Danger, Label property) 
 | Token / unit | واحد |
 | Series | سری (اوراق) / فرصت سرمایه‌گذاری |
 | Subscription | پذیره‌نویسی |
-| Issuer | ناشر / متقاضی تأمین مالی |
+| Issuer (the fund) | ناشر (صندوق) |
+| Applicant / project company | متقاضی تأمین مالی |
 | Fund (sponsor) | صندوق (نهاد ارزیاب و ارائه‌دهنده) |
 | Digital ID | شناسه دیجیتال |
 | Payment ID | شناسه پرداخت |
 | Maturity | سررسید |
 | Guarantee | تضمین / ضمانت‌نامه |
-| Credit grade | رتبه اعتباری |
+| Credit case | پرونده اعتباری |
+| Credit limit | حد اعتباری |
+| Applicant rate / investor rate | نرخ متقاضی / نرخ سرمایه‌گذار (to confirm) |
+| Assessment fee | کارمزد ارزیابی (to confirm) |
 | Under-subscription rule | قاعده عدم تکمیل پذیره‌نویسی: «همه یا هیچ» / «تأمین به میزان جذب‌شده» |
 | Approve / prepare | تأیید / تهیه و ارسال برای تأیید |
 

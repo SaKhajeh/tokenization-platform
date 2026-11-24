@@ -356,7 +356,7 @@ Norm ceiling 418,500; one active guarantee of 60,000 (Ra 0.8, Re 0.7) uses 60,00
 | W13 | Negative net sales: the workbook computes on, reading a loss over negative sales as a positive margin, and every ceiling comes out negative | Refused like zero sales (W5): scoring stops with “sales of Y-n is negative” (2026-11-24) |
 | W14 | Rc, Ra and Re are free decimals in the workbook | The platform accepts at most three decimals (stored as numeric(4,3)), so the stored coefficients and the computed limit always agree (2026-11-24) |
 
-## 9. Effect on existing plan documents (confirmed, D-C6 — these supersede the older text until 02 and 05 are edited)
+## 9. Effect on existing plan documents (confirmed, D-C6; applied to 02 (v1.1), 03 and 05 on 2026-11-24)
 
 - PRD FR-ISS-1 (issuer onboarding) → replaced by the case.
 - PRD FR-ASM-2 / glossary "credit grade" / S-11 — the weighted scorecard and grade A–D are removed. The case owns the company-level norm ceiling; the application's credit step is "limit check": the analyst sets Ra and Re for the project, project ceiling = remaining norm × Ra × Re, and the approved amount may not exceed it. On approval the usage ledger deducts the amount (§7.5); on repayment it is released.

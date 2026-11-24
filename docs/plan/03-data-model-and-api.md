@@ -2,7 +2,7 @@
 
 _Version 1.0 draft · 2026-11-04 · Companion to plan/02-prd-v1.md (FR IDs referenced) · All PRD §16 assumptions confirmed as v1 defaults._
 
-_Updated 2026-11-24: `invitation_deliveries` (§1.2), chain outbox and `invitations.deliver` jobs as built (§2), idempotency as built (§3.1). New config: CHAIN_TX_STALE_SEC, IDEMPOTENCY_STALE_SEC._
+_Updated 2026-11-24: ledger posting map for fees, spread and disbursement (§1.6), applicants instead of issuers and the credit case (§1.8), guarantee policy removed (§1.9), series and terms with both rates (§1.10); `invitation_deliveries` (§1.2), chain outbox and `invitations.deliver` jobs as built (§2), idempotency as built (§3.1). New config: CHAIN_TX_STALE_SEC, IDEMPOTENCY_STALE_SEC._
 
 ---
 
@@ -116,11 +116,12 @@ Posting map (Dr → Cr, signed so that the lines of each entry sum to 0):
 | Subscribe (reserve) | org_available | org_reserved[series] |
 | Release / cancel | org_reserved[series] | org_available |
 | Issue (allocation) | org_reserved[series] | series_escrow[series] |
-| Application fee | org_available (issuer) | fees_fund / fees_platform (split) |
-| Arrangement fee | series_escrow | fees_fund / fees_platform |
-| Disbursement to issuer (sent) | series_escrow | collection_bank |
-| Issuer repayment received | collection_bank | series_repayment[series] |
-| Payout to holder | series_repayment[series] | org_available |
+| Assessment / application fee (invoice paid; built) | org_available (applicant) | fund_revenue_services / platform_revenue_services (split) + vat_payable |
+| ~~Arrangement fee~~ | — | removed (D-C21) |
+| Disbursement to the project company (sent) | series_escrow | collection_bank |
+| Project-company repayment received (applicant rate) | collection_bank | series_repayment[series] |
+| Fund spread at payout (waterfall, D27) | series_repayment[series] | fund_revenue_spread |
+| Payout to holder (investor rate) | series_repayment[series] | org_available |
 | Withdrawal requested | org_available | org_withdrawal_hold |
 | Withdrawal sent | org_withdrawal_hold | collection_bank |
 | Withdrawal failed | org_withdrawal_hold | org_available |
@@ -138,7 +139,9 @@ unit_movements(id, series_id, org_id, delta bigint, kind[mint|burn|forced_transf
 
 -- holdings is updated only when its movement is confirmed on-chain
 
-### 1.8 Issuers, Initiatives, Applications
+### 1.8 Applicants, Initiatives, Applications
+
+_2026-11-24: as built, `issuer_profiles` became `applicant_profiles` and `issuer_org_id` became `applicant_org_id` on initiatives and applications (migration 004, D14); the applicant onboarding was then replaced by the credit case (doc 07 §10: cases, case items and files, financials, visits, inquiries, scoring_methods, assessment_rounds, credit_limits, limit_usages, application_limit_checks). `credit_scorecard_versions` and `credit_assessments` below are replaced by the scoring rounds and the limit check; `proposed_rate` is not used (rates come from the rate policy, D26). The tables after the limit check (DD, committee) are the v1.0 draft (D-C22). As built: `apps/api/src/db/migrations`._
 
 ```
 issuer_profiles(org_id PK, status[requested|in_review|approved|rejected|suspended], tax_id, sector,
@@ -173,6 +176,7 @@ committee_votes(id, session_id, application_id, user_id, vote[approve|approve_wi
 
 ```
 guarantee_types(id, code, name_fa, name_en, active)
+-- guarantee_policy_* : REMOVED (doc 07 §9) — collateral classes and coefficients live in scoring_methods
 guarantee_policy_versions(id, version, status[draft|active|retired], effective_from, approved_by)
 guarantee_policy_rules(id, policy_version_id, investment_type, credit_grade, allowed_type_ids uuid[],
                        min_coverage_pct numeric(6,2), allow_combination bool, min_buffer_days_after_maturity int)
@@ -185,7 +189,8 @@ guarantees(id, application_id, series_id NULL, type_id, guarantor_name, guaranto
 ### 1.10 Series & Return Engine
 
 ```
-series(id, series_code UNIQUE, application_id, initiative_id, issuer_org_id, status /* PRD §7.2 */,
+series(id, series_code UNIQUE, application_id, initiative_id, issuer_org_id /* = the fund, D14 */, applicant_org_id,
+       credit_limit_id, collateral_class, pre_assessed bool, pre_assessed_on NULL /* D23 */, status /* PRD §7.2 */,
        current_terms_version_id, token_address NULL, token_symbol, token_name, terms_hash bytea NULL,
        raised_amount bigint NULL, issued_units bigint NULL, risk_status[normal|watch|at_risk],
        listing_fund_approved_by, listing_fund_approved_at,
@@ -194,10 +199,11 @@ series_terms_versions(id, series_id, version, terms jsonb /* canonical JSON, PRD
                       terms_hash bytea, status[draft|signed|superseded],
                       issuer_signed_by, issuer_signed_at, fund_signed_by, fund_signed_at)
 payout_schedule_rows(id, series_id, terms_version_id, due_date, principal_per_unit bigint,
-                     return_per_unit bigint, total_per_unit bigint, seq int)
+                     return_per_unit bigint /* investor rate */, applicant_return_per_unit bigint, spread_per_unit bigint,
+                     total_per_unit bigint, seq int)   -- both rates: buildSpreadSchedule in packages/domain (D26)
 ```
 
-terms jsonb keys (canonical, sorted, no whitespace, before hashing): series_code, issuer_org_id, initiative_id, contract_type, contract_doc_sha256, investment_type, credit_grade, face_value_per_unit, target_amount, min_amount, under_subscription_rule, annual_rate, return_model:"simple", day_count:"jalali_actual", subscription_open_at, subscription_close_at, close_on_target, allow_cancel_during_offer, issue_date, maturity_date, payout_type:"bullet", min_units_per_org, max_units_per_org, fees, guarantee_ids, disclosure_doc_sha256s, schedule:[{due_date, principal_per_unit, return_per_unit}]
+terms jsonb keys (canonical, sorted, no whitespace, before hashing; updated 2026-11-24 for D14, D23, D26, D27 and doc 07): series_code, issuer_org_id, applicant_org_id, initiative_id, financing_contract_doc_sha256, investment_type, credit_limit_ref, collateral_class, pre_assessed (+ assessed_on), face_value_per_unit, target_amount, min_amount, under_subscription_rule, rate_basis, applicant_rate, investor_rate, waterfall_order, return_model:"simple", day_count:"jalali_actual", subscription_open_at, subscription_close_at, close_on_target, allow_cancel_during_offer, issue_date, maturity_date, payout_type:"bullet", min_units_per_org, max_units_per_org, fees, guarantee_ids, disclosure_doc_sha256s, schedule:[{due_date, principal_per_unit, return_per_unit}]
 
 ### 1.11 Subscriptions, Issuance, Payouts
 
