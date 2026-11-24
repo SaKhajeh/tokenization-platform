@@ -1,3 +1,4 @@
+import { OrgsService } from "./orgs/orgs.service.js";
 /** HTTP endpoints for milestone M-C (part 1): applicant onboarding, initiatives + applications, notifications, jobs. */
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
 import { TicketsService } from "./tickets/tickets.service.js";
@@ -180,18 +181,19 @@ export class NotificationsController {
 
 @Controller()
 export class JobsController {
-  constructor(private readonly kyb: KybService, private readonly apps: ApplicationsService, private readonly n: NotificationsService, private readonly tickets: TicketsService, private readonly limits: LimitsService) {}
+  constructor(private readonly kyb: KybService, private readonly apps: ApplicationsService, private readonly n: NotificationsService, private readonly tickets: TicketsService, private readonly limits: LimitsService, private readonly orgs: OrgsService) {}
 
   @Post("admin/jobs/:name/run")
   @HttpCode(200)
   @StaffOnly("super_admin")
   run(@Param() p: unknown) {
-    const { name } = parse(z.object({ name: z.enum(["kyb-expiry", "application-expiry", "sms", "ticket-escalation", "visit-reminders", "case-housekeeping"]) }), p);
+    const { name } = parse(z.object({ name: z.enum(["kyb-expiry", "application-expiry", "sms", "ticket-escalation", "visit-reminders", "case-housekeeping", "invitations"]) }), p);
     if (name === "kyb-expiry") return this.kyb.runExpiry();
     if (name === "application-expiry") return this.apps.expireInactive();
     if (name === "ticket-escalation") return this.tickets.escalateOverdue();
     if (name === "visit-reminders") return this.limits.remindVisits();
     if (name === "case-housekeeping") return this.limits.housekeeping();
+    if (name === "invitations") return this.orgs.deliverQueuedInvitations();
     return this.n.sendQueuedSms();
   }
 }

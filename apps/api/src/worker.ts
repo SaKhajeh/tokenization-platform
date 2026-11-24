@@ -4,6 +4,7 @@
  *   cobank.deposits.poll    every 120 s — Jibit "waiting for verify" deposits → accept / hold / refund
  *   cobank.settlements.poll every 120 s — track sent withdrawals at Jibit → completed / failed / reverted
  *   notifications.sms       every 30 s  — deliver queued SMS
+ *   invitations.deliver     every 30 s  — invitation codes the request could not send (outbox, encrypted until sent)
  *   tickets.escalate        every 600 s — overdue tickets (waiting for the fund) → fund manager
  *   visits.remind           every 3600 s — SMS the day before a confirmed site visit
  *   cases.housekeeping      every 3600 s — expire credit limits; close cases idle for 90 days
@@ -28,6 +29,7 @@ import { ApplicationsService } from "./applications/applications.service.js";
 import { WithdrawalsService } from "./withdrawals/withdrawals.service.js";
 import { TicketsService } from "./tickets/tickets.service.js";
 import { LimitsService } from "./cases/limits.service.js";
+import { OrgsService } from "./orgs/orgs.service.js";
 
 const log = new Logger("worker");
 
@@ -44,6 +46,7 @@ async function main() {
   const withdrawals = ctx.get(WithdrawalsService);
   const tickets = ctx.get(TicketsService);
   const limits = ctx.get(LimitsService);
+  const orgs = ctx.get(OrgsService);
 
   let stopping = false;
   const every = (name: string, ms: number, fn: () => Promise<unknown>) => {
@@ -65,6 +68,7 @@ async function main() {
   every("cobank.deposits.poll", 120_000, () => deposits.poll());
   every("cobank.settlements.poll", 120_000, () => withdrawals.poll());
   every("notifications.sms", 30_000, () => withLease(db, "notifications.sms", 120, () => notifications.sendQueuedSms()));
+  every("invitations.deliver", 30_000, () => orgs.deliverQueuedInvitations());
   every("kyb.expiry", 3_600_000, () => kyb.runExpiry());
   every("applications.expiry", 3_600_000, () => withLease(db, "applications.expiry", 600, () => apps.expireInactive()));
   every("tickets.escalate", 600_000, () => tickets.escalateOverdue());

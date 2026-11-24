@@ -40,6 +40,7 @@ In dev the SMS provider is `mock`: OTP codes are printed to the console. Set `SM
 | Audit | Append-only `audit_log`; each row hashes the previous one (SHA-256). DB triggers block UPDATE/DELETE/TRUNCATE. `GET /admin/audit/verify` re-checks the chain. |
 | Personal data | National code stored AES-256-GCM encrypted plus an HMAC for lookups. Mobiles masked in member lists. |
 | Documents | Presigned S3/MinIO upload → `complete` checks the object exists and the size matches. PDF/JPEG/PNG ≤ 20 MB. Downloads are logged. |
+| Invitations | The code goes out through an outbox (`invitation_deliveries`) written with the invitation: sent right away, and by the worker (`invitations.deliver`, 30 s) if that fails or the process dies after the commit. The code is stored AES-256-GCM encrypted until sent, then wiped; revoking, replacing or accepting an invitation cancels its pending message. At-least-once: a rare crash between sending and marking sent repeats the same code. |
 | Single-user orgs (D17) | New orgs start in single-user mode; it switches off automatically when a second member joins and cannot be turned back on while there are two. |
 
 ## M-B: how money and identity work

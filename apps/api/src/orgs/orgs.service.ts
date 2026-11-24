@@ -1,10 +1,11 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { DB, Db, Queryable } from "../db/db.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { ApiError, Errors } from "../common/errors.js";
 import { uuidv7 } from "../common/ids.js";
-import { randomToken, sha256Hex } from "../common/crypto.js";
+import { decrypt, encrypt, randomToken, sha256Hex } from "../common/crypto.js";
+import { withLease } from "../common/lease.js";
 import { isValidLegalNationalId, normalizeDigits, normalizeEmail, normalizeMobile } from "../common/validators.js";
 import { AuditService } from "../audit/audit.service.js";
 import { EMAIL, MessageSender, SMS } from "../integrations/providers.js";
@@ -21,8 +22,18 @@ const E = {
   alreadyMember: () => new ApiError(409, "ALREADY_MEMBER", "Already an active member", "این کاربر هم‌اکنون عضو سازمان است."),
 };
 
+/** Invitation messages: tries per message before giving up (the admin can invite again). */
+const INVITATION_MAX_ATTEMPTS = 5;
+
+/** Cancels pending deliveries of invitations that are no longer open, wiping their encrypted codes. */
+const cancelClosedDeliveries = (q: Queryable, invitationIds: string[]) =>
+  invitationIds.length
+    ? q.query(`update invitation_deliveries set status = 'cancelled', token_enc = null, locked_until = null where invitation_id = any($1::uuid[]) and status = 'queued'`, [invitationIds])
+    : Promise.resolve();
+
 @Injectable()
 export class OrgsService {
+  private readonly log = new Logger("orgs");
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(CONFIG) private readonly cfg: AppConfig,
@@ -124,7 +135,11 @@ export class OrgsService {
       );
       if (member.rows.length) throw E.alreadyMember();
       // A new invitation to the same person replaces any open one.
-      await q.query(`update org_invitations set revoked_at = now() where org_id = $1 and destination = $2 and accepted_at is null and revoked_at is null`, [req.org!.id, dest]);
+      const replaced = await q.query(
+        `update org_invitations set revoked_at = now() where org_id = $1 and destination = $2 and accepted_at is null and revoked_at is null returning id`,
+        [req.org!.id, dest],
+      );
+      await cancelClosedDeliveries(q, replaced.rows.map((r: any) => r.id));
       const id = uuidv7();
       await q.query(
         `insert into org_invitations (id, org_id, destination, channel, role, token_hash, invited_by, expires_at)
@@ -132,13 +147,79 @@ export class OrgsService {
         [id, req.org!.id, dest, channel, input.role, sha256Hex(token), req.user!.id, this.cfg.invitationTtlSec],
       );
       await this.audit.append(q, { ...actor(req), orgId: req.org!.id, action: "member.invited", entityType: "invitation", entityId: id, after: { destination: dest, role: input.role } });
+      // The message goes through an outbox written in this transaction: if the process dies after the commit,
+      // the worker still sends it. The code is stored encrypted and wiped once sent.
+      const orgName = (await q.query(`select legal_name from orgs where id = $1`, [req.org!.id])).rows[0].legal_name;
+      await q.query(
+        `insert into invitation_deliveries (invitation_id, channel, destination, org_name, token_enc) values ($1,$2,$3,$4,$5)`,
+        [id, channel, dest, orgName, encrypt(this.cfg.dataEncryptionKey, token)],
+      );
       return { id, destination: dest, role: input.role };
     });
-    const orgName = (await this.db.query(`select legal_name from orgs where id = $1`, [req.org!.id])).rows[0].legal_name;
-    // Sent after the commit. If the process dies right here, a retry with the same Idempotency-Key replays the
-    // recorded invitation without sending the code; the admin can revoke and invite again.
-    await (channel === "sms" ? this.sms : this.email).sendText(dest, `دعوت به «${orgName}» در پلتفرم توکن‌سازی. کد دعوت: ${token}`, out.id);
+    // Try right away so the invitee gets the code without waiting for the worker. A failure here is not the
+    // caller's failure: the invitation exists and the worker retries the delivery.
+    await this.deliverInvitation(out.id).catch((e) => this.log.warn(`invitation ${out.id}: immediate delivery failed: ${e?.message ?? e}`));
     return { ...out, ...(this.cfg.exposeInvitationTokens ? { token } : {}) };
+  }
+
+  /**
+   * Sends one queued invitation message. Safe to call from the request and the worker at the same time: a sender
+   * first claims the row for two minutes. At-least-once: if a sender dies after sending but before marking it sent,
+   * the claim lapses and the same code is sent again (the message id is the invitation id, for provider dedupe).
+   */
+  async deliverInvitation(invitationId: string): Promise<"sent" | "skipped" | "cancelled" | "retry" | "failed"> {
+    const claimed = (
+      await this.db.query(
+        `update invitation_deliveries d set locked_until = now() + interval '2 minutes', attempts = attempts + 1
+         where invitation_id = $1 and status = 'queued' and (locked_until is null or locked_until < now())
+         returning d.*, (select i.accepted_at is not null or i.revoked_at is not null or i.expires_at <= now()
+                         from org_invitations i where i.id = d.invitation_id) as closed`,
+        [invitationId],
+      )
+    ).rows[0];
+    if (!claimed) return "skipped";
+    if (claimed.closed) {
+      await this.db.query(`update invitation_deliveries set status = 'cancelled', token_enc = null, locked_until = null where invitation_id = $1`, [invitationId]);
+      return "cancelled";
+    }
+    const token = decrypt(this.cfg.dataEncryptionKey, claimed.token_enc);
+    try {
+      await (claimed.channel === "sms" ? this.sms : this.email).sendText(
+        claimed.destination, `دعوت به «${claimed.org_name}» در پلتفرم توکن‌سازی. کد دعوت: ${token}`, invitationId,
+      );
+    } catch (e: any) {
+      const msg = String(e?.message ?? e).slice(0, 300);
+      const r = await this.db.query(
+        `update invitation_deliveries set last_error = $2, locked_until = null,
+           status = case when attempts >= $3 then 'failed' else 'queued' end,
+           token_enc = case when attempts >= $3 then null else token_enc end
+         where invitation_id = $1 returning status`,
+        [invitationId, msg, INVITATION_MAX_ATTEMPTS],
+      );
+      return r.rows[0]?.status === "failed" ? "failed" : "retry";
+    }
+    await this.db.query(`update invitation_deliveries set status = 'sent', sent_at = now(), token_enc = null, locked_until = null where invitation_id = $1`, [invitationId]);
+    return "sent";
+  }
+
+  /** Worker job: deliver queued invitation messages the request could not send (crash, provider outage). */
+  async deliverQueuedInvitations(limit = 50) {
+    const res = await withLease(this.db, "invitations.deliver", 120, async () => {
+      const rows = (
+        await this.db.query(
+          `select invitation_id from invitation_deliveries where status = 'queued' and (locked_until is null or locked_until < now())
+           order by created_at limit $1`,
+          [limit],
+        )
+      ).rows;
+      const out: Record<string, number> = {};
+      for (const r of rows) {
+        const s = await this.deliverInvitation(r.invitation_id);
+        out[s] = (out[s] ?? 0) + 1;
+      }
+      return out;
+    });
+    return res ?? { skipped: "another worker holds the lease" };
   }
 
   async revokeInvitation(req: AppRequest, id: string) {
@@ -148,6 +229,7 @@ export class OrgsService {
         [id, req.org!.id],
       );
       if (!r.rows.length) throw E.invitation();
+      await cancelClosedDeliveries(q, [id]);
       await this.audit.append(q, { ...actor(req), orgId: req.org!.id, action: "member.invitation_revoked", entityType: "invitation", entityId: id });
     });
   }
@@ -179,6 +261,7 @@ export class OrgsService {
         await q.query(`insert into org_members (id, org_id, user_id, role, invited_by) values ($1,$2,$3,$4,$5)`, [memberId, inv.org_id, u.id, inv.role, inv.invited_by]);
       }
       await q.query(`update org_invitations set accepted_at = now(), accepted_by = $2 where id = $1`, [inv.id, u.id]);
+      await cancelClosedDeliveries(q, [inv.id]); // accepted before the message was confirmed sent: nothing left to send
       await this.audit.append(q, { ...actor(req), orgId: inv.org_id, action: "member.joined", entityType: "member", entityId: memberId, after: { role: inv.role, invitation_id: inv.id } });
       // D17: a second active member ends single-user mode (maker–checker applies again).
       const o = (await q.query(`select single_user_mode from orgs where id = $1 for update`, [inv.org_id])).rows[0];
