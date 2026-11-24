@@ -377,6 +377,9 @@ export function scoreCase(input: ScoringInput, method: ScoringMethod = DEFAULT_S
   const [s0, s1, s2] = st;
   st.forEach((s, i) => {
     if (s.sales === 0) errs.push(`sales of Y-${i} is zero`);
+    // Negative net sales make every ratio and band meaningless (a loss over negative sales reads as a profit margin)
+    // and flip the sign of every ceiling, so the "credit limit" came out negative. The workbook has no rule for it.
+    else if (s.sales < 0) errs.push(`sales of Y-${i} is negative`);
   });
   if (s0.totalAssets === 0) errs.push("total assets of Y0 is zero");
   if (errs.length) throw new ScoringInputError(errs);

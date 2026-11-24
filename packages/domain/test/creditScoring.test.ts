@@ -123,6 +123,15 @@ describe("refuses what the workbook would turn into #VALUE! / #DIV/0! (W5)", () 
       expect((e as ScoringInputError).problems).toEqual(["sales of Y-2 is zero"]);
     }
   });
+  it("negative sales (which flipped every ceiling negative)", () => {
+    const neg: ScoringInput = { ...sample, years: [{ ...sample.years[0], sales: -310_000, cogs: -350_500 }, sample.years[1], sample.years[2]] };
+    try {
+      scoreCase(neg);
+      throw new Error("should fail");
+    } catch (e) {
+      expect((e as ScoringInputError).problems).toEqual(["sales of Y-0 is negative"]);
+    }
+  });
   it("usage needs Ra and Re above zero", () => {
     expect(() => usageLedger(100, [{ id: "x", amount: 1, ra: 0, re: 0.5, active: true }])).toThrow(/Ra and Re/);
   });

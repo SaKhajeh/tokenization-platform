@@ -2,9 +2,11 @@
 
 Modules mirror PRD M1–M19. **Done:** M-A (auth, orgs/members/roles, tasks, audit log, documents),
 M-B (KYB, bank accounts, custodial wallet + on-chain digital ID, double-entry ledger, Cobank deposits) and
-M-C (applicant onboarding, initiatives + funding applications through screening, notifications, KYB expiry, withdrawals).
+M-C (initiatives + funding applications through screening, notifications, KYB expiry, withdrawals) and
+M-D parts 1–5 (the credit case, scoring, credit limit and limit check; see `docs/plan/01-master-plan.md` §6 items 15–19).
+The M-C applicant onboarding below was replaced by the credit case in M-D part 4: an approved credit limit now makes an org an applicant.
 **D14:** the fund is the only issuer; companies are *applicants* that request financing.
-Next: credit assessment, due diligence, committee and the pre-assessed import path (M-D). Shared logic comes from `@tp/domain`
+Next: series terms with both rates, the pre-assessed import path (D23), and the steps after the limit check (D-C22). Shared logic comes from `@tp/domain`
 (state machines, Jalali dates), built automatically before tests and builds.
 
 ## Run
@@ -17,7 +19,7 @@ npm run dev -w @tp/api            # http://localhost:3000/api/v1
 npm run seed:staff -w @tp/api -- 09121234567 super_admin   # make a staff user (after they log in once)
 npm run worker -w @tp/api         # background jobs: chain outbox (10 s), Cobank deposit poll (2 min)
 npm run seed:fund -w @tp/api -- <شناسه ملی> "<name>" <admin mobile>   # mark the fund org: the single issuer (D14)
-npm test -w @tp/api               # 73 e2e tests on in-memory Postgres (PGlite) — no Docker needed
+npm test -w @tp/api               # 92 e2e tests on in-memory Postgres (PGlite) — no Docker needed
 npm run test:chain -w @tp/api     # + the chain worker against a local node with the real IdentityRegistry
 ```
 
@@ -130,3 +132,10 @@ POST /admin/withdrawals/poll
 - **Legal national ID checksum** (`isValidLegalNationalId`) follows the published algorithm but must be checked
   against real شناسه ملی values before production; `VALIDATE_LEGAL_ID_CHECKSUM=false` turns it off.
 - Rate limiting by IP (in front of OTP) belongs in the gateway/nginx; the app limits per destination.
+- **Idempotency key after a crash:** the stored response is written after the business transaction commits. If the
+  process dies in between, the key stays "in progress" and every retry with it gets `IDEMPOTENCY_IN_PROGRESS`; the
+  client must use a new key, which for a non-idempotent create could repeat it. Fix by recording the response inside
+  the business transaction (open decision).
+- **Chain outbox, stuck transactions:** a sent tx with no confirmed receipt after `CHAIN_TX_STALE_SEC` (default 30 min)
+  is re-queued; the pre-send check confirms it if it landed. A tx stuck in the mempool for low gas still blocks later
+  nonces; replacing it with a higher fee is not automated yet.

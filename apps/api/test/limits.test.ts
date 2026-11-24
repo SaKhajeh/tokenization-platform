@@ -79,6 +79,8 @@ describe("credit case part 4a: tariff, visit, scoring, approval, credit limit", 
 
     // ---- scoring: reasons are mandatory; the result matches the method on the verified figures
     expect((await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(anfm.auth).send({ ...scoreBody, reasons: { rc: "ok" } })).status).toBe(400);
+    // Rc/Ra/Re are kept with three decimals: finer values are refused instead of being rounded after the limit is computed
+    expect((await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(anfm.auth).send({ ...scoreBody, guarantee: { rc: 0.9, ra: 0.8125, re: 0.7 } })).status).toBe(400);
     const sc = await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(anfm.auth).send(scoreBody).expect(200);
     const expected = scoreCase({ activityType: "production_line", years: [year(310000), year(205000), year(138000)].map(toFinancialYear) as any, guarantee: scoreBody.guarantee });
     expect(sc.body.result.credit_limit).toBe(toRials(expected.creditLimit).toString());

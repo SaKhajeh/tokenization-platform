@@ -391,7 +391,7 @@ export class CasesController {
   addUsage(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
     const b = parse(z.object({
       source_type: z.enum(["existing_guarantee", "existing_facility"]), description: zText(3, 500),
-      amount: z.string().regex(/^[1-9]\d{0,17}$/), ra: z.number().gt(0).max(1), re: z.number().gt(0).max(1),
+      amount: z.string().regex(/^[1-9]\d{0,17}$/), ra: zCoefPositive, re: zCoefPositive,
     }), body);
     return this.limits.addUsage(req, parse(zId, p).id, b);
   }
@@ -401,7 +401,7 @@ export class CasesController {
   @HttpCode(200)
   @StaffOnly("analyst")
   limitCheck(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
-    const b = parse(z.object({ ra: z.number().gt(0).max(1), re: z.number().gt(0).max(1), reason: zText(5, 2000) }), body);
+    const b = parse(z.object({ ra: zCoefPositive, re: zCoefPositive, reason: zText(5, 2000) }), body);
     return this.limits.checkApplication(req, parse(zId, p).id, b);
   }
 
@@ -413,7 +413,15 @@ export class CasesController {
   }
 }
 
-const zJ = z.object({ rc: z.number().min(0).max(1), ra: z.number().min(0).max(1), re: z.number().min(0).max(1) });
+/**
+ * Rc, Ra and Re: 0..1 with at most three decimals. The database keeps them as numeric(4,3); a finer value was
+ * rounded there while the limit had been computed with the unrounded one (and a value below 0.0005 became 0,
+ * which the usage tables reject with a server error).
+ */
+const threeDecimals = (x: number) => Math.abs(x * 1000 - Math.round(x * 1000)) < 1e-9;
+const zCoef = z.number().min(0).max(1).refine(threeDecimals, "at most three decimals");
+const zCoefPositive = z.number().gt(0).max(1).refine(threeDecimals, "at most three decimals");
+const zJ = z.object({ rc: zCoef, ra: zCoef, re: zCoef });
 
 const zComment = z.object({
   target_type: z.enum(COMMENT_TARGETS),
