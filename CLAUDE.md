@@ -1,6 +1,6 @@
 # Guidance for Claude Code sessions in this repo
 
-Read `docs/plan/` first (master plan, PRD, data model & API, Jibit integration, UX spec). If it is empty, ask Salman to add the plan docs from the claude.ai project "Tokenization Platform".
+Read `docs/plan/` first (master plan, PRD, data model & API, Jibit integration, UX spec, credit case). **Keep it current:** every change that alters a decision, requirement, table, job, endpoint, config value or screen updates the matching plan document in the same commit, and every finished piece of work gets an entry in `01-master-plan.md` §6 with the test counts (how-to: `01-master-plan.md` §7).
 
 ## Non-negotiables
 1. **Money = `bigint` rials** end to end (`@tp/domain/money`). The API sends money as decimal strings. Never `number`, never floats, never toman in storage.
