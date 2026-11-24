@@ -54,6 +54,8 @@ export interface AppConfig {
     registryAddress: string;
     operatorPrivateKey: string;
     confirmations: number;
+    /** A sent transaction with no confirmed receipt after this many seconds goes back to the queue (dropped or stuck). */
+    staleAfterSec: number;
     minPriorityFeeGwei: string;
     explorer: string | null;
     /** Extended PUBLIC key for custodial org addresses: the API can derive addresses but holds no private keys. */
@@ -136,6 +138,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       registryAddress: process.env.IDENTITY_REGISTRY_ADDRESS ?? "",
       operatorPrivateKey: process.env.OPERATOR_PRIVATE_KEY ?? "",
       confirmations: Number(process.env.CHAIN_CONFIRMATIONS ?? 5),
+      staleAfterSec: Number(process.env.CHAIN_TX_STALE_SEC ?? 1800),
       minPriorityFeeGwei: process.env.MIN_PRIORITY_FEE_GWEI ?? "30",
       explorer: process.env.CHAIN_EXPLORER ?? "https://amoy.polygonscan.com",
       custodyXpub: process.env.CUSTODY_XPUB ?? (prod ? "" : HDNodeWallet.fromPhrase(TEST_MNEMONIC, undefined, "m/44'/60'/0'/1").neuter().extendedKey),

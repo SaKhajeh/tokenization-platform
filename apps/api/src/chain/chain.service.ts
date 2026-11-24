@@ -76,7 +76,16 @@ export class ChainService {
     for (const t of submitted) {
       try {
         const r = await this.chain.receipt(t.tx_hash);
-        if (r.status === "pending") continue;
+        if (r.status === "pending") {
+          // A transaction can be dropped from the mempool (or stuck) and never get a receipt. After a while, put it
+          // back in the queue: the pre-send check below sees whether it landed after all, so nothing is applied twice.
+          const ageSec = (Date.now() - new Date(t.submitted_at).getTime()) / 1000;
+          if (t.submitted_at && ageSec > this.cfg.chain.staleAfterSec) {
+            await this.reschedule(t, `no confirmed receipt after ${Math.round(ageSec)} s (tx ${t.tx_hash}); re-queued`);
+            out.retried++;
+          }
+          continue;
+        }
         if (r.status === "success") {
           await this.db.tx(async (q) => {
             await q.query(`update chain_txs set status='confirmed', confirmed_at=now(), block_number=$2, gas_used=$3, updated_at=now() where id=$1`, [t.id, r.blockNumber, r.gasUsed]);
@@ -165,8 +174,14 @@ export class ChainService {
     const w = (await q.query(`select * from wallets where org_id = $1`, [orgId])).rows[0];
     if (!org || !w) return;
     const valid = org.kyb_expires_at && new Date(org.kyb_expires_at) > new Date();
+    // The key must name the KYB event, not only the call: a revoke or reinstate call has the same payload every
+    // time (kind + wallet), so keying on the payload alone silently dropped the second revoke after a second
+    // expiry (and the second reinstate). The latest KYB case and its expiry identify the event; repeating the
+    // sync for the same event still produces the same key and is a no-op.
+    const latest = (await q.query(`select id from kyb_cases where org_id = $1 order by version desc limit 1`, [orgId])).rows[0];
+    const event = `${latest?.id ?? "none"}:${org.kyb_expires_at ? new Date(org.kyb_expires_at).toISOString() : "none"}`;
     const queue = async (call: ChainCall) => {
-      const key = `${call.kind}:${w.address}:${keccak256(toUtf8Bytes(JSON.stringify(call))).slice(2, 18)}`;
+      const key = `${call.kind}:${w.address}:${keccak256(toUtf8Bytes(`${event}|${JSON.stringify(call)}`)).slice(2, 18)}`;
       await q.query(
         `insert into chain_txs (id, purpose, ref_type, ref_id, payload, idempotency_key) values ($1,$2,'wallet',$3,$4,$5) on conflict (idempotency_key) do nothing`,
         [uuidv7(), call.kind, w.id, JSON.stringify(call), key],

@@ -269,5 +269,56 @@ describe("KYB expiry", () => {
     const expires = (await t.http.get(`${V}/kyb`).set(a.admin.auth).set(a.org).expect(200)).body.kyb_expires_at;
     expect(id.expiry).toBe(Math.floor(new Date(expires).getTime() / 1000));
     expect((await t.http.get(`${V}/wallet`).set(a.admin.auth).set(a.org).expect(200)).body.registry_status).toBe("registered");
+
+    // A second expiry must revoke again. (Regression: the revoke call has the same payload every time, and keying
+    // the outbox on the payload alone dropped this second revoke, leaving an expired org verified on-chain.)
+    await t.db.query(`update orgs set kyb_expires_at = now() - interval '1 minute' where id = $1`, [a.orgId]);
+    expect((await t.http.post(`${V}/admin/jobs/kyb-expiry/run`).set(ops.auth).expect(200)).body.expired).toBe(1);
+    await processChain();
+    expect(t.chain.identities.get(getAddress(w.address))!.revoked).toBe(true);
+    expect((await t.http.get(`${V}/wallet`).set(a.admin.auth).set(a.org).expect(200)).body.registry_status).toBe("revoked");
+
+    // …and a second re-KYB must reinstate again.
+    const reg2 = await t.http.post(`${V}/kyb/registry`).set(a.admin.auth).set(a.org).expect(200);
+    const body2 = { snapshot_id: reg2.body.snapshot.id, fields: KYB_FIELDS };
+    const su2 = await stepUp(t, a.admin, "POST", `${V}/kyb/submit`, body2);
+    const sub2 = await t.http.post(`${V}/kyb/submit`).set(a.admin.auth).set({ ...a.org, "x-step-up-token": su2 }).set(idem()).send(body2).expect(201);
+    expect(sub2.body.version).toBe(3);
+    await t.http.post(`${V}/admin/kyb/${sub2.body.id}/decision`).set(co.auth).send({ decision: "approve" }).expect(200);
+    await processChain();
+    expect(t.chain.identities.get(getAddress(w.address))!.revoked).toBe(false);
+    expect((await t.http.get(`${V}/wallet`).set(a.admin.auth).set(a.org).expect(200)).body.registry_status).toBe("registered");
+  });
+});
+
+describe("chain outbox", () => {
+  it("re-queues a sent transaction that never gets a receipt, and does not apply it twice", async () => {
+    t.chain.autoConfirm = false;
+    try {
+      const a = await approvedOrg(t, 61, { compliance: co });
+      await t.http.post(`${V}/admin/chain/process`).set(ops.auth).expect(200);
+      const tx = (await t.db.query(`select c.* from chain_txs c join wallets w on w.id::text = c.ref_id where w.org_id = $1`, [a.orgId])).rows[0];
+      expect(tx.status).toBe("submitted");
+
+      // Still no receipt, but not old yet: left alone.
+      await t.http.post(`${V}/admin/chain/process`).set(ops.auth).expect(200);
+      expect((await t.db.query(`select status from chain_txs where id = $1`, [tx.id])).rows[0].status).toBe("submitted");
+
+      // Older than CHAIN_TX_STALE_SEC: back to the queue.
+      await t.db.query(`update chain_txs set submitted_at = now() - interval '2 hours' where id = $1`, [tx.id]);
+      await t.http.post(`${V}/admin/chain/process`).set(ops.auth).expect(200);
+      const back = (await t.db.query(`select status, last_error from chain_txs where id = $1`, [tx.id])).rows[0];
+      expect(back.status).toBe("queued");
+      expect(back.last_error).toMatch(/no confirmed receipt/);
+
+      // The first send landed after all: the pre-send check confirms it instead of sending again.
+      const sends = t.chain.txs.size;
+      await t.db.query(`update chain_txs set next_attempt_at = now() where id = $1`, [tx.id]);
+      await t.http.post(`${V}/admin/chain/process`).set(ops.auth).expect(200);
+      expect((await t.db.query(`select status from chain_txs where id = $1`, [tx.id])).rows[0].status).toBe("confirmed");
+      expect(t.chain.txs.size).toBe(sends);
+    } finally {
+      t.chain.autoConfirm = true;
+    }
   });
 });
