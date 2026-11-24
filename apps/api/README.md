@@ -36,7 +36,7 @@ In dev the SMS provider is `mock`: OTP codes are printed to the console. Set `SM
 | Sessions | 15-min JWT access token + 30-day refresh token that rotates; reusing an old refresh token revokes the session. Bound to a device; devices can be listed and revoked. |
 | Step-up | `POST /auth/step-up {method,path,body}` → OTP → single-use token valid only for that exact request (sent as `X-Step-Up-Token`). Used for member/role changes, invitations, org settings; money actions next. |
 | Org scoping | Org routes take `X-Org-Id`; the guard checks active membership and role. Non-members get **404**, not 403. |
-| Idempotency | Creates require `Idempotency-Key`. A replay returns the stored response with `Idempotent-Replay: true`; the same key with a different body → 422. |
+| Idempotency | Creates require `Idempotency-Key`. A replay returns the stored response with `Idempotent-Replay: true`; the same key with a different body → 422. The response is stored **inside the handler's transaction** (`Db.tx` writes it before COMMIT), so a crash can't leave a committed action without a response; a key with no response older than `IDEMPOTENCY_STALE_SEC` (default 300) died before committing and is taken over. Handlers must do all writes in one `db.tx` and return its result. |
 | Audit | Append-only `audit_log`; each row hashes the previous one (SHA-256). DB triggers block UPDATE/DELETE/TRUNCATE. `GET /admin/audit/verify` re-checks the chain. |
 | Personal data | National code stored AES-256-GCM encrypted plus an HMAC for lookups. Mobiles masked in member lists. |
 | Documents | Presigned S3/MinIO upload → `complete` checks the object exists and the size matches. PDF/JPEG/PNG ≤ 20 MB. Downloads are logged. |
@@ -132,10 +132,6 @@ POST /admin/withdrawals/poll
 - **Legal national ID checksum** (`isValidLegalNationalId`) follows the published algorithm but must be checked
   against real شناسه ملی values before production; `VALIDATE_LEGAL_ID_CHECKSUM=false` turns it off.
 - Rate limiting by IP (in front of OTP) belongs in the gateway/nginx; the app limits per destination.
-- **Idempotency key after a crash:** the stored response is written after the business transaction commits. If the
-  process dies in between, the key stays "in progress" and every retry with it gets `IDEMPOTENCY_IN_PROGRESS`; the
-  client must use a new key, which for a non-idempotent create could repeat it. Fix by recording the response inside
-  the business transaction (open decision).
 - **Chain outbox, stuck transactions:** a sent tx with no confirmed receipt after `CHAIN_TX_STALE_SEC` (default 30 min)
   is re-queued; the pre-send check confirms it if it landed. A tx stuck in the mempool for low gas still blocks later
   nonces; replacing it with a higher fee is not automated yet.

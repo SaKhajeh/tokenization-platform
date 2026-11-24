@@ -1,5 +1,6 @@
 import pg from "pg";
 import type { PGlite } from "@electric-sql/pglite";
+import { recordInTransaction } from "../common/idempotency-context.js";
 
 /** Minimal SQL surface shared by node-postgres (production) and PGlite (tests). Plain SQL, no ORM. */
 export interface Queryable {
@@ -32,10 +33,12 @@ export class PgDb implements Db {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const out = await fn({
+      const q: Queryable = {
         query: (s, p = []) => client.query(s, p as any[]) as any,
         exec: async (s) => void (await client.query(s)),
-      });
+      };
+      const out = await fn(q);
+      await recordInTransaction(q, out); // the idempotency key's response commits with the business change
       await client.query("COMMIT");
       return out;
     } catch (e) {
@@ -62,7 +65,12 @@ export class PgliteDb implements Db {
   tx<T>(fn: (q: Queryable) => Promise<T>): Promise<T> {
     // PGlite is single-connection: serialise transactions to mimic a pool.
     const run = this.chain.then(() =>
-      this.pg.transaction((t) => fn({ query: (s, p = []) => t.query(s, p) as any, exec: async (s) => void (await t.exec(s)) })),
+      this.pg.transaction(async (t) => {
+        const q: Queryable = { query: (s, p = []) => t.query(s, p) as any, exec: async (s) => void (await t.exec(s)) };
+        const out = await fn(q);
+        await recordInTransaction(q, out);
+        return out;
+      }),
     );
     this.chain = run.catch(() => undefined);
     return run as Promise<T>;

@@ -135,6 +135,8 @@ export class OrgsService {
       return { id, destination: dest, role: input.role };
     });
     const orgName = (await this.db.query(`select legal_name from orgs where id = $1`, [req.org!.id])).rows[0].legal_name;
+    // Sent after the commit. If the process dies right here, a retry with the same Idempotency-Key replays the
+    // recorded invitation without sending the code; the admin can revoke and invite again.
     await (channel === "sms" ? this.sms : this.email).sendText(dest, `دعوت به «${orgName}» در پلتفرم توکن‌سازی. کد دعوت: ${token}`, out.id);
     return { ...out, ...(this.cfg.exposeInvitationTokens ? { token } : {}) };
   }

@@ -9,7 +9,7 @@ Read `docs/plan/` first (master plan, PRD, data model & API, Jibit integration, 
 4. **Ledger:** append-only double-entry; every entry sums to 0; corrections are reversals. Posting map: data-model doc §1.6 + Jibit doc §3.
 5. **Org scoping:** every org-owned query filters by the active org. Add an isolation test for each new repository.
 6. **Maker–checker:** `prepared_by ≠ approved_by`, except a single-user org (OTP step-up). Staff actions never allow self-approval.
-7. **Idempotency:** every POST that moves money, units or state requires an `Idempotency-Key`. Chain writes go through the outbox.
+7. **Idempotency:** every POST that moves money, units or state requires an `Idempotency-Key`. An `@Idempotent()` handler does all its writes in **one** `db.tx(...)` and returns that transaction's result as the response (the transaction records it under the key before COMMIT). External calls go before the transaction, or through an outbox. Chain writes go through the outbox.
 8. **No personal data on-chain.** Only hashes (`orgIdHash`, `kybHash`, `termsHash`).
 9. **Farsi RTL UI:** Vazirmatn font, Persian digits, design tokens from `packages/ui` (mirrors the Figma file).
 10. **Jibit:** all calls go through adapters with mock implementations. Never call Jibit from tests.

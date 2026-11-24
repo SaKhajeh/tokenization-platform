@@ -45,16 +45,18 @@ export class DocumentsService {
     if (req.org!.role === "viewer") throw Errors.forbidden("Viewers cannot upload documents");
     const id = uuidv7();
     const key = `orgs/${req.org!.id}/${id}`;
-    await this.db.tx(async (q) => {
+    // The response is built inside the transaction so it is recorded with it (idempotency: one tx, returned result).
+    // Presigning is a local signature, not a network call.
+    return this.db.tx(async (q) => {
       await q.query(
         `insert into documents (id, owner_type, owner_id, org_id, category, access_level, filename, mime, size_bytes, storage_key, uploaded_by)
          values ($1,'org',$2,$2,$3,'owner_org',$4,$5,$6,$7,$8)`,
         [id, req.org!.id, input.category, input.filename, input.mime, input.size, key, req.user!.id],
       );
       await this.audit.append(q, { ...actor(req), orgId: req.org!.id, action: "document.upload_started", entityType: "document", entityId: id, after: { category: input.category, filename: input.filename, size: input.size } });
+      const url = await this.storage.presignPut(key, input.mime, input.size, this.cfg.documentUrlTtlSec);
+      return { document_id: id, upload_url: url, method: "PUT", headers: { "content-type": input.mime }, expires_in: this.cfg.documentUrlTtlSec };
     });
-    const url = await this.storage.presignPut(key, input.mime, input.size, this.cfg.documentUrlTtlSec);
-    return { document_id: id, upload_url: url, method: "PUT", headers: { "content-type": input.mime }, expires_in: this.cfg.documentUrlTtlSec };
   }
 
   /** The client reports the SHA-256 it computed; we confirm the object exists with the declared size. */
