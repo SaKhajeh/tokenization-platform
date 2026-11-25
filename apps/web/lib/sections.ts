@@ -39,11 +39,11 @@ export const SECTIONS: Record<string, SectionDef> = {
     title: "۲. وضعیت دانش‌بنیانی",
     fields: [
       { key: "is_knowledge_based", label: "شرکت دانش‌بنیان است", type: "bool", required: true },
-      { key: "type", label: "نوع", type: "select", options: [["نوپا", "نوپا"], ["تولیدی", "تولیدی"], ["فناور", "فناور"], ["سایر", "سایر"]], hint: "فقط برای شرکت‌های دانش‌بنیان" },
-      { key: "approval_date", label: "تاریخ تأیید", type: "date" },
-      { key: "validity_date", label: "اعتبار تا", type: "date" },
-      { key: "field", label: "حوزه", type: "text" },
-      { key: "products", label: "محصولات دانش‌بنیان", type: "textarea", wide: true },
+      { key: "type", label: "نوع", type: "select", required: true, options: [["نوپا", "نوپا"], ["تولیدی", "تولیدی"], ["فناور", "فناور"], ["سایر", "سایر"]] },
+      { key: "approval_date", label: "تاریخ تأیید", type: "date", required: true },
+      { key: "validity_date", label: "اعتبار تا", type: "date", required: true },
+      { key: "field", label: "حوزه", type: "text", required: true },
+      { key: "products", label: "محصولات دانش‌بنیان", type: "textarea", required: true, wide: true },
     ],
   },
   locations: {

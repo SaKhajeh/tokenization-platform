@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
-import { Banner, Button, Card, Chip, KV, Status, TextArea, jdate, jdatetime } from "@tp/ui";
+import { Banner, Button, Card, Chip, KV, Status, TextArea, fa, jdate, jdatetime } from "@tp/ui";
 import { Shell } from "@/components/Shell";
 import { useStaff } from "@/lib/me";
 
@@ -29,13 +29,14 @@ export default function KybReview() {
     await api.post(`/admin/kyb/${id}/decision`, { decision, ...(reason.trim() ? { reason: reason.trim() } : {}) });
     q.reload();
   });
+  const openDoc = useAction(async (_k, docId: string) => { const r = await api.get<{ url: string }>(`/documents/${docId}/download`); window.open(r.url, "_blank", "noopener"); });
   const k = q.data;
   const same = (a?: string, b?: string) => (a ?? "").replace(/\s/g, "") === (b ?? "").replace(/\s/g, "");
   return (
     <Shell title={k ? `احراز هویت: ${k.legal_name}` : "احراز هویت"} action={k ? <Status kind="kyb" value={k.status} /> : null}>
       <div className="stack">
         <Link href="/kyb">← بازگشت به صف</Link>
-        <ErrorBanner error={q.error} />
+        <ErrorBanner error={q.error ?? openDoc.error} />
         {k && (<>
           {(k.risk_flags.length > 0 || k.bounced_cheques > 0) && (
             <Banner tone="danger">هشدارهای استعلام: {[...k.risk_flags.map((f) => FLAG_FA[f] ?? f), ...(k.bounced_cheques ? [`${k.bounced_cheques.toLocaleString("fa-IR")} چک برگشتی`] : [])].join("، ")}. رد خودکار انجام نمی‌شود؛ تصمیم با شماست.</Banner>
@@ -43,7 +44,7 @@ export default function KybReview() {
           <div className="cmp">
             <Card title={`سامانه‌ی ثبت (استعلام ${jdatetime(k.registry.fetched_at)})`}>
               <KV rows={[
-                ["نام", k.registry.name], ["شناسه‌ی ملی", <span key="n" className="ltr">{k.registry.national_id}</span>], ["شماره و تاریخ ثبت", `${k.registry.register_number} — ${k.registry.register_date}`],
+                ["نام", k.registry.name], ["شناسه‌ی ملی", <span key="n" className="ltr">{k.registry.national_id}</span>], ["شماره و تاریخ ثبت", fa(`${k.registry.register_number} — ${k.registry.register_date}`)],
                 ["نوع", k.registry.company_type], ["وضعیت", k.registry.state], ["فعالیت", k.registry.activity], ["نشانی", k.registry.address],
                 ["کد پستی", <span key="p" className="ltr">{k.registry.postal_code}</span>], ["صاحبان امضا", k.registry.signature_authority],
                 ["مدیران", k.registry.people.map((p) => `${p.name}${p.position ? ` (${p.position})` : ""}`).join("، ") || "—"],
@@ -56,7 +57,9 @@ export default function KybReview() {
                 ["کد پستی", <span key="p" className={`ltr ${same(k.fields.postal_code, k.registry.postal_code) ? "" : "diff"}`}>{k.fields.postal_code}</span>],
                 ["تلفن", <span key="t" className="ltr">{k.fields.phone}</span>], ["وب‌سایت", k.fields.website ?? "—"], ["ایمیل", k.fields.contact_email ?? "—"],
                 ["ارسال‌کننده", <span key="s">{k.submitted_by.full_name ?? ""} <span className="ltr">{k.submitted_by.mobile}</span></span>],
-                ["اختیار نماینده", k.authority_basis === "registry" ? "نام در سامانه‌ی ثبت" : <Chip key="c" tone="warning">با معرفی‌نامه — پیوست را بررسی کنید</Chip>],
+                ["اختیار نماینده", k.authority_basis === "registry" ? "نام در سامانه‌ی ثبت" : (
+                  <span key="c" className="row"><Chip tone="warning">با معرفی‌نامه</Chip>{k.authority_doc_id && <Button size="sm" variant="ghost" onClick={() => openDoc.run(k.authority_doc_id!)}>مشاهده‌ی معرفی‌نامه</Button>}</span>
+                )],
                 ["تاریخ ارسال", jdatetime(k.submitted_at)],
               ]} />
             </Card>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { sectionProblems, type FormSection } from "@tp/domain/caseFile";
+import { jalaliToIso } from "@tp/domain/jalali";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, Card, Check, JalaliDateInput, Select, Status, TextArea, TextInput, Toast, latin } from "@tp/ui";
 import { Shell } from "@/components/Shell";
@@ -64,7 +65,14 @@ export default function SectionPage() {
 
   useEffect(() => {
     if (!sec) return;
-    const base = sec.state === "empty" || !Object.keys(sec.data ?? {}).length ? { ...sec.prefill } : { ...sec.data };
+    let base: Record<string, any> = sec.state === "empty" || !Object.keys(sec.data ?? {}).length ? structuredClone(sec.prefill ?? {}) : structuredClone(sec.data);
+    // the registry returns Jalali dates ("1398/01/15"); the form stores ISO dates
+    for (const f of def?.fields ?? []) {
+      const v = get(base, f.key);
+      if (f.type === "date" && typeof v === "string" && /^1[34]\d\d\/\d{1,2}\/\d{1,2}$/.test(v)) {
+        try { base = set(base, f.key, jalaliToIso(v)); } catch { /* leave it for the user to correct */ }
+      }
+    }
     setData(base);
   }, [sec?.section, sec?.state, cs.data?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

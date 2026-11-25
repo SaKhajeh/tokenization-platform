@@ -93,6 +93,27 @@ describe("OTP throttling", () => {
       await strict.close();
     }
   });
+
+  it("throttles per purpose: confirming right after login, or two different actions back to back, is not refused", async () => {
+    const strict = await makeApp({ otpResendCooldownSec: 60, otpMaxPerHour: 2, otpMaxStepUpPerHour: 3 });
+    try {
+      const s = await login(strict, "09121110015"); // a login code was just sent
+      const ask = (path: string) => strict.http.post("/api/v1/auth/step-up").set(s.auth).send({ method: "POST", path, body: {} });
+      expect((await ask("/api/v1/case/submit")).status).toBe(200); // right after the login code
+      expect((await ask("/api/v1/case/letter/sign")).status).toBe(200); // a different action at once
+      const again = await ask("/api/v1/case/submit"); // the same action again: resend cooldown
+      expect(again.status).toBe(429);
+      expect(again.body.error.code).toBe("OTP_COOLDOWN");
+      await strict.db.query(`update otp_challenges set created_at = now() - interval '2 minutes'`);
+      expect((await ask("/api/v1/case/submit")).status).toBe(200);
+      const cap = await ask("/api/v1/bank-accounts"); // fourth confirmation within the hour
+      expect(cap.body.error.code).toBe("OTP_RATE_LIMIT");
+      // the login budget is separate
+      expect((await strict.http.post("/api/v1/auth/otp/request").send({ destination: "09121110015" })).status).toBe(200);
+    } finally {
+      await strict.close();
+    }
+  });
 });
 
 describe("sessions", () => {

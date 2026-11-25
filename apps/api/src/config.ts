@@ -14,6 +14,8 @@ export interface AppConfig {
   otpTtlSec: number;
   otpResendCooldownSec: number;
   otpMaxPerHour: number;
+  /** Step-up codes per destination per hour (separate from login codes). */
+  otpMaxStepUpPerHour: number;
   otpMaxAttempts: number;
   stepUpTtlSec: number;
   invitationTtlSec: number;
@@ -89,6 +91,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     otpTtlSec: 120,
     otpResendCooldownSec: 60,
     otpMaxPerHour: 5,
+    otpMaxStepUpPerHour: Number(process.env.OTP_MAX_STEP_UP_PER_HOUR ?? 30),
     otpMaxAttempts: 5,
     stepUpTtlSec: 300,
     invitationTtlSec: 7 * 24 * 3600,

@@ -49,15 +49,20 @@ export class AuthService {
   }
 
   private async issueChallenge(dest: string, channel: "sms" | "email", purpose: Purpose, userId: string | null, action: string | null) {
-    const recent = await this.db.query<{ created_at: Date }>(
-      `select created_at from otp_challenges where destination = $1 and created_at > now() - interval '1 hour' order by created_at desc`,
-      [dest],
+    // Throttling is per purpose. The resend cooldown applies to the same request only (a login, or a step-up for the
+    // same action), so confirming an action right after logging in, or two different actions back to back, is not
+    // refused. Confirmations have their own hourly budget, so working through a case does not lock the login out.
+    const recent = await this.db.query<{ created_at: Date; action_hash: string | null }>(
+      `select created_at, action_hash from otp_challenges
+       where destination = $1 and purpose = $2 and created_at > now() - interval '1 hour' order by created_at desc`,
+      [dest, purpose],
     );
-    if (recent.rows.length) {
-      const since = (Date.now() - new Date(recent.rows[0].created_at).getTime()) / 1000;
+    const same = recent.rows.filter((r) => purpose === "login" || r.action_hash === action);
+    if (same.length) {
+      const since = (Date.now() - new Date(same[0].created_at).getTime()) / 1000;
       if (since < this.cfg.otpResendCooldownSec) throw E.cooldown(Math.ceil(this.cfg.otpResendCooldownSec - since));
-      if (recent.rows.length >= this.cfg.otpMaxPerHour) throw E.hourly();
     }
+    if (recent.rows.length >= (purpose === "login" ? this.cfg.otpMaxPerHour : this.cfg.otpMaxStepUpPerHour)) throw E.hourly();
     const id = uuidv7();
     const code = otpCode();
     await this.db.query(
