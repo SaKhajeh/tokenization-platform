@@ -1,7 +1,7 @@
 import { CallHandler, ExecutionContext, Inject, Injectable, NestInterceptor, SetMetadata } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { Observable, catchError, finalize, from, mergeMap, of, throwError } from "rxjs";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { CONFIG } from "./tokens.js";
 import type { AppConfig } from "../config.js";
 import { canonicalJson, sha256Hex } from "./crypto.js";

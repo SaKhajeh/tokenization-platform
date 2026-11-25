@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -8,8 +8,8 @@ import { decrypt, encrypt, randomToken, sha256Hex } from "../common/crypto.js";
 import { withLease } from "../common/lease.js";
 import { isValidLegalNationalId, normalizeDigits, normalizeEmail, normalizeMobile } from "../common/validators.js";
 import { AuditService } from "../audit/audit.service.js";
-import { EMAIL, MessageSender, SMS } from "../integrations/providers.js";
-import { actor, AppRequest, OrgRole } from "../common/context.js";
+import { EMAIL, type MessageSender, SMS } from "../integrations/providers.js";
+import { actor, type AppRequest, OrgRole } from "../common/context.js";
 
 const E = {
   shahkar: () => new ApiError(403, "SHAHKAR_REQUIRED", "Verify your national code first", "ابتدا کد ملی خود را تأیید کنید."),

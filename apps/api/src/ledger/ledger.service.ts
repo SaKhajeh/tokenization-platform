@@ -8,7 +8,7 @@
  * Posting is idempotent by key: a retried job gets the existing entry back instead of posting twice.
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { uuidv7 } from "../common/ids.js";
 import { ApiError } from "../common/errors.js";
 

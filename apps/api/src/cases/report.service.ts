@@ -4,10 +4,10 @@
  */
 import { Inject, Injectable } from "@nestjs/common";
 import { casePeople, financialAnalysis, isoFromUtcDate, scoringRatios, statement, toFinancialYear, figureProblems } from "@tp/domain";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 import { uuidv7 } from "../common/ids.js";
 
 const err = {

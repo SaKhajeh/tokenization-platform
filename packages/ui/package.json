@@ -2,6 +2,19 @@
   "name": "@tp/ui",
   "version": "0.1.0",
   "private": true,
-  "description": "RTL design tokens (mirrors the Figma file 'Tokenization Platform — UX v1')",
-  "main": "tokens.json"
+  "description": "RTL design system for the apps: tokens (mirrors the Figma file 'Tokenization Platform — UX v1'), CSS and React components",
+  "type": "module",
+  "main": "src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./styles.css": "./src/styles.css",
+    "./tokens.json": "./tokens.json"
+  },
+  "dependencies": {
+    "@fontsource-variable/vazirmatn": "5.3.0",
+    "@tp/domain": "0.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
 }

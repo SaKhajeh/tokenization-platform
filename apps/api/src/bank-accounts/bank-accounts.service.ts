@@ -6,13 +6,13 @@
  *   no match → pending_review + compliance task (e.g. a name variant). Never auto-verified.
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { AuditService } from "../audit/audit.service.js";
-import { REGISTRY, RegistryProvider } from "../integrations/registry.js";
+import { REGISTRY, type RegistryProvider } from "../integrations/registry.js";
 import { ApiError, Errors } from "../common/errors.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 import { uuidv7 } from "../common/ids.js";
 import { normalizeDigits } from "../common/validators.js";
 import { closeWorkflowTasks, staffTask } from "../common/workflow.js";

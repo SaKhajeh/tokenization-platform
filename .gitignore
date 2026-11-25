@@ -12,3 +12,6 @@ packages/contracts/deployments/hardhat.json
 packages/contracts/deployments/localhost.json
 infra/web3signer/keys/
 .DS_Store
+.next/
+next-env.d.ts
+*.tsbuildinfo

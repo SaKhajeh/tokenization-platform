@@ -1,0 +1,26 @@
+{
+  "name": "@tp/admin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Service app for fund and platform staff (Farsi RTL, desktop-first)",
+  "scripts": {
+    "dev": "npm run build -w @tp/domain --silent && next dev -p 3002",
+    "build": "npm run build -w @tp/domain --silent && next build",
+    "start": "next start -p 3002",
+    "typecheck": "npm run build -w @tp/domain --silent && tsc --noEmit"
+  },
+  "dependencies": {
+    "@tp/client": "0.1.0",
+    "@tp/domain": "0.1.0",
+    "@tp/ui": "0.1.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "~5.6.3"
+  }
+}

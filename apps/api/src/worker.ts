@@ -21,7 +21,7 @@ import { loadConfig } from "./config.js";
 import { AppModule, buildDeps } from "./app.module.js";
 import { ChainService } from "./chain/chain.service.js";
 import { DepositsService } from "./deposits/deposits.service.js";
-import { DB, Db } from "./db/db.js";
+import { DB, type Db } from "./db/db.js";
 import { withLease } from "./common/lease.js";
 import { NotificationsService } from "./notifications/notifications.service.js";
 import { KybService } from "./kyb/kyb.service.js";

@@ -1,9 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { ApiError, Errors } from "../common/errors.js";
 import { uuidv7 } from "../common/ids.js";
 import { AuditService } from "../audit/audit.service.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 
 type Status = "open" | "in_progress" | "done" | "cancelled";
 const NEXT: Record<Status, Status[]> = {

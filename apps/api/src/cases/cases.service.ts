@@ -11,15 +11,11 @@
  * scoring rounds, fund-manager approval and the credit limit (part 4).
  */
 import { Inject, Injectable } from "@nestjs/common";
-import {
-  CASE, CASE_EDITABLE, CASE_ITEM, CaseState, checklistItem, casePeople, expectedSlots, FINANCIAL_FIELDS, FORM_SECTIONS, FORM_SECTION_TITLES,
-  FormSection, ITEM_RETURNED, ItemState, jalaliYearOf, reconcileSlots, sectionProblems, statement, toFinancialYear, transition, yearProblems,
-  figureProblems, bankTotals, StatementType,
-} from "@tp/domain";
-import { DB, Db, Queryable } from "../db/db.js";
+import { CASE, CASE_EDITABLE, CASE_ITEM, CaseState, checklistItem, casePeople, expectedSlots, FINANCIAL_FIELDS, FORM_SECTIONS, FORM_SECTION_TITLES, FormSection, ITEM_RETURNED, ItemState, jalaliYearOf, reconcileSlots, sectionProblems, statement, toFinancialYear, transition, yearProblems, figureProblems, bankTotals, StatementType } from "@tp/domain";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 import { uuidv7 } from "../common/ids.js";
 import { closeWorkflowTasks, staffTask } from "../common/workflow.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
@@ -28,7 +24,7 @@ import { CommentsService } from "./comments.service.js";
 import { assessmentFee } from "./fees.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
-import { ObjectStorage, STORAGE } from "../integrations/providers.js";
+import { type ObjectStorage, STORAGE } from "../integrations/providers.js";
 
 const err = {
   noCase: () => new ApiError(404, "NO_CASE", "This organisation has no credit case; choose financing first", "این سازمان پرونده‌ی اعتباری ندارد؛ ابتدا درخواست تأمین مالی را انتخاب کنید."),

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, SetMetadata, createParamDecorator } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { jwtVerify } from "jose";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { CONFIG } from "./tokens.js";
 import type { AppConfig } from "../config.js";
 import { ApiError, Errors } from "./errors.js";

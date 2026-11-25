@@ -128,16 +128,26 @@ export class S3Storage implements ObjectStorage {
 }
 
 /** Dev/test storage: "uploads" are recorded with put(). */
+/**
+ * Dev/test storage. Objects live in memory. With a `devBaseUrl` (local development) the presigned URLs point at the
+ * API's dev-only upload/download routes (DevStorageController), so the apps can upload and view files without MinIO.
+ */
 export class MemoryStorage implements ObjectStorage {
   readonly objects = new Map<string, number>();
+  readonly bytes = new Map<string, { data: Buffer; mime: string; filename?: string }>();
+  constructor(private readonly devBaseUrl: string | null = null) {}
   put(key: string, size: number) {
     this.objects.set(key, size);
   }
+  putBytes(key: string, data: Buffer, mime: string) {
+    this.objects.set(key, data.length);
+    this.bytes.set(key, { data, mime });
+  }
   async presignPut(key: string) {
-    return `memory://upload/${key}`;
+    return this.devBaseUrl ? `${this.devBaseUrl}/dev/storage/${Buffer.from(key).toString("base64url")}` : `memory://upload/${key}`;
   }
   async presignGet(key: string) {
-    return `memory://download/${key}`;
+    return this.devBaseUrl ? `${this.devBaseUrl}/dev/storage/${Buffer.from(key).toString("base64url")}` : `memory://download/${key}`;
   }
   async head(key: string) {
     const size = this.objects.get(key);

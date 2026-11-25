@@ -8,13 +8,11 @@
  * The per-service price list of D25 (service_catalogue) is retired: the tariff replaced it (doc 07 §6d).
  */
 import { Inject, Injectable } from "@nestjs/common";
-import {
-  buildSpreadSchedule, invoiceTotals, jalaliYearOf, maturityAfterMonths, RateBasis, rateCompare, seriesEconomics, WaterfallOrder,
-} from "@tp/domain";
-import { DB, Db, Queryable } from "../db/db.js";
+import { buildSpreadSchedule, invoiceTotals, jalaliYearOf, maturityAfterMonths, RateBasis, rateCompare, seriesEconomics, WaterfallOrder } from "@tp/domain";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError } from "../common/errors.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 import { uuidv7 } from "../common/ids.js";
 import { currentTariff } from "../cases/fees.js";
 

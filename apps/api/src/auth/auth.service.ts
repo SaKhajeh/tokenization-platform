@@ -1,13 +1,13 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { SignJWT } from "jose";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { ApiError } from "../common/errors.js";
 import { decrypt, encrypt, hmacHex, otpCode, randomToken, safeEqualHex, sha256Hex } from "../common/crypto.js";
 import { uuidv7 } from "../common/ids.js";
 import { isValidNationalCode, normalizeDigits, normalizeEmail, normalizeMobile } from "../common/validators.js";
-import { EMAIL, IDENTITY, IdentityProvider, MessageSender, SMS } from "../integrations/providers.js";
+import { EMAIL, IDENTITY, type IdentityProvider, type MessageSender, SMS } from "../integrations/providers.js";
 import { AuditService } from "../audit/audit.service.js";
 import { actionHash } from "../common/stepup.js";
 import type { AppRequest } from "../common/context.js";

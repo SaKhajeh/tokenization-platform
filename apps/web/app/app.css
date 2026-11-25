@@ -1,0 +1,58 @@
+/* App shell (UX spec §2.2): header with the org switcher; bottom nav on mobile, a right-side rail from 1024 px. */
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.top {
+  position: sticky; top: 0; z-index: 20; background: var(--primary-900); color: #fff;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; display: flex; align-items: center; gap: 12px;
+}
+.top .brand { font-weight: 700; font-size: 15px; white-space: nowrap; }
+.top .org-switch { margin-inline-start: auto; background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.25); border-radius: 10px; font: inherit; font-size: 13px; padding: 6px 10px; max-width: 55vw; }
+.top .org-switch option { color: var(--neutral-900); }
+.top .bell { color: #fff; font-size: 13px; background: rgba(255,255,255,.12); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.top .bell:hover { text-decoration: none; background: rgba(255,255,255,.2); }
+.main { flex: 1; width: 100%; max-width: 960px; margin: 0 auto; padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px)); }
+.page-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 16px; flex-wrap: wrap; }
+
+.nav {
+  position: fixed; bottom: 0; inset-inline: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--neutral-300);
+  display: grid; grid-template-columns: repeat(4, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 10px; color: var(--neutral-600); font-size: 12px; min-height: 56px; justify-content: center; }
+.nav a:hover { text-decoration: none; color: var(--neutral-900); }
+.nav a[aria-current="page"] { color: var(--primary-700); font-weight: 600; }
+.nav svg { width: 22px; height: 22px; }
+
+@media (min-width: 1024px) {
+  .shell { flex-direction: row; }
+  .nav { position: sticky; top: 0; height: 100vh; width: 220px; grid-template-columns: 1fr; align-content: start; border-top: 0; border-inline-start: 1px solid var(--neutral-300); padding-top: 72px; gap: 4px; }
+  .nav a { flex-direction: row; justify-content: flex-start; gap: 10px; font-size: 14px; padding: 10px 20px; min-height: 44px; }
+  .nav a[aria-current="page"] { background: var(--primary-100); }
+  .shell-body { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .main { padding-bottom: 40px; }
+}
+
+/* the balance / limit card: the one bold element on the home screen */
+.hero-figure { display: flex; flex-direction: column; gap: 4px; }
+.hero-figure .t-display { letter-spacing: -.2px; }
+.next-action { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+/* credit-case path: six steps, the current one marked */
+.path { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.path span { height: 6px; border-radius: 999px; background: rgba(255,255,255,.25); }
+.path span.done { background: #9fc0ff; }
+.path span.current { background: #fff; }
+
+.auth { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--primary-900); }
+.auth .card { width: 100%; max-width: 420px; padding: 24px; }
+
+.doc-group { border-top: 1px solid var(--neutral-300); padding-top: 12px; }
+.slot { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--neutral-100); }
+.slot:last-child { border-bottom: 0; }
+.file-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; background: var(--neutral-100); border-radius: 8px; padding: 6px 10px; }
+.review-note { border-inline-start: 3px solid var(--warning-600); background: var(--warning-100); color: var(--warning-700); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+
+.fin-table input { min-height: 36px; padding: 4px 8px; text-align: left; direction: ltr; font-feature-settings: "tnum"; }
+.fin-table .total td { font-weight: 600; background: var(--neutral-100); }
+.fin-table .group td { font-weight: 700; color: var(--primary-900); padding-top: 18px; }
+
+.repeat-row { border: 1px solid var(--neutral-300); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.fieldset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }

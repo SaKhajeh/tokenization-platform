@@ -159,6 +159,11 @@ export class MockRegistry implements RegistryProvider {
   readonly ibans = new Map<string, { legalId: string; status?: IbanInfo["status"]; bank?: string; owners?: string[] }>();
   readonly bounced = new Map<string, number>();
   calls: string[] = [];
+  /**
+   * Local development only: any well-formed IBAN is ACTIVE and matches the org, so the apps can be used end to end
+   * without Jibit. Tests construct the mock without it and register IBANs explicitly.
+   */
+  constructor(private readonly demo = false) {}
 
   async legalIdentity(nationalId: string): Promise<LegalIdentity | null> {
     this.calls.push(`legal:${nationalId}`);
@@ -187,13 +192,15 @@ export class MockRegistry implements RegistryProvider {
   }
   async ibanInfo(iban: string): Promise<IbanInfo | null> {
     this.calls.push(`iban:${iban}`);
-    const x = this.ibans.get(iban);
+    const x = this.ibans.get(iban) ?? (this.demo ? { legalId: "*" } : undefined);
     if (!x) return null;
     return { iban, bank: x.bank ?? "بانک آزمون", depositNumber: iban.slice(-13), status: x.status ?? "ACTIVE", owners: x.owners ?? ["شرکت آزمون"], raw: { mock: true } };
   }
   async matchIbanLegal(iban: string, legalNationalId: string) {
     this.calls.push(`match:${iban}`);
-    return this.ibans.get(iban)?.legalId === legalNationalId;
+    const x = this.ibans.get(iban);
+    if (!x && this.demo) return true;
+    return x?.legalId === legalNationalId;
   }
   async bouncedChequeCount(nationalCode: string) {
     return this.bounced.get(nationalCode) ?? 0;

@@ -9,12 +9,12 @@
  * (e.g. we crashed after broadcasting), we mark the job confirmed instead of sending again.
  */
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { uuidv7 } from "../common/ids.js";
 import { AuditService } from "../audit/audit.service.js";
-import { CHAIN, ChainCall, ChainGateway, FLAG_FUND, FLAG_INVESTOR, FLAG_ISSUER, alreadyApplied, deriveOrgAddress, orgIdHash } from "./gateway.js";
+import { CHAIN, type ChainCall, type ChainGateway, FLAG_FUND, FLAG_INVESTOR, FLAG_ISSUER, alreadyApplied, deriveOrgAddress, orgIdHash } from "./gateway.js";
 import { keccak256, toUtf8Bytes } from "ethers";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import type { AppRequest } from "../common/context.js";

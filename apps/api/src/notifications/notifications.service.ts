@@ -4,9 +4,9 @@
  * (production needs one pre-approved Jibit pattern per event key; dev uses the in-memory sender).
  */
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { uuidv7 } from "../common/ids.js";
-import { SMS, MessageSender } from "../integrations/providers.js";
+import { SMS, type MessageSender } from "../integrations/providers.js";
 import type { OrgRole } from "../common/context.js";
 import { Errors } from "../common/errors.js";
 

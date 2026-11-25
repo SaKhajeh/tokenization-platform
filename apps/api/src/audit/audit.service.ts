@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { canonicalJson, sha256Hex } from "../common/crypto.js";
 
 export const GENESIS_HASH = "0".repeat(64);

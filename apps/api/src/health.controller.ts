@@ -1,6 +1,6 @@
 import { Controller, Get, Inject } from "@nestjs/common";
 import { Public } from "./common/guards.js";
-import { DB, Db } from "./db/db.js";
+import { DB, type Db } from "./db/db.js";
 
 @Controller("health")
 export class HealthController {

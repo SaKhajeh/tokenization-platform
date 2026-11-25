@@ -8,10 +8,10 @@
  */
 import { Inject, Injectable } from "@nestjs/common";
 import { APPLICATION, ApplicationStatus, canTransition, isoFromUtcDate, jalaliYearOf } from "@tp/domain";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 import { uuidv7 } from "../common/ids.js";
 import { closeWorkflowTasks, staffTask } from "../common/workflow.js";
 import { NotificationsService } from "../notifications/notifications.service.js";

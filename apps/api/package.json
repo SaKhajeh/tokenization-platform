@@ -5,7 +5,7 @@
   "description": "NestJS modular monolith — M-A (auth, orgs, tasks, audit, documents) + M-B (KYB, bank accounts, wallets/digital ID, ledger, deposits)",
   "type": "module",
   "scripts": {
-    "build": "npm run build -w @tp/domain --silent && tsc -p tsconfig.json",
+    "build": "npm run build -w @tp/domain --silent && tsc -p tsconfig.json && node -e \"require('fs').cpSync('src/db/migrations','dist/db/migrations',{recursive:true})\"",
     "start": "node dist/main.js",
     "dev": "node --import @swc-node/register/esm-register src/main.ts",
     "migrate": "node --import @swc-node/register/esm-register src/db/cli.ts migrate",

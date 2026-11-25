@@ -4,7 +4,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, NestFactory } from "@nestjs/cor
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import type { AppConfig } from "./config.js";
-import { DB, Db, PgDb, PgliteDb } from "./db/db.js";
+import { DB, type Db, PgDb, PgliteDb } from "./db/db.js";
 import { CONFIG } from "./common/tokens.js";
 import { ApiExceptionFilter } from "./common/errors.js";
 import { AccessGuard } from "./common/guards.js";
@@ -21,14 +21,11 @@ import { TasksController } from "./tasks/tasks.controller.js";
 import { DocumentsService } from "./documents/documents.service.js";
 import { DocumentsController } from "./documents/documents.controller.js";
 import { HealthController } from "./health.controller.js";
-import {
-  EMAIL, IDENTITY, IdentityProvider, JibitIdentity, JibitSms, MemorySender, MemoryStorage, MessageSender, MockIdentity,
-  ObjectStorage, S3Storage, SMS, STORAGE,
-} from "./integrations/providers.js";
+import { EMAIL, IDENTITY, type IdentityProvider, JibitIdentity, JibitSms, MemorySender, MemoryStorage, type MessageSender, MockIdentity, type ObjectStorage, S3Storage, SMS, STORAGE } from "./integrations/providers.js";
 import { JibitHttp, jibitProducts } from "./integrations/jibit.js";
-import { JibitRegistry, MockRegistry, REGISTRY, RegistryProvider } from "./integrations/registry.js";
-import { COBANK, CobankProvider, JibitCobank, MockCobank } from "./integrations/cobank.js";
-import { CHAIN, ChainGateway, EvmChain, MockChain } from "./chain/gateway.js";
+import { JibitRegistry, MockRegistry, REGISTRY, type RegistryProvider } from "./integrations/registry.js";
+import { COBANK, type CobankProvider, JibitCobank, MockCobank } from "./integrations/cobank.js";
+import { CHAIN, type ChainGateway, EvmChain, MockChain } from "./chain/gateway.js";
 import { ChainService } from "./chain/chain.service.js";
 import { LedgerService } from "./ledger/ledger.service.js";
 import { KybService } from "./kyb/kyb.service.js";
@@ -50,6 +47,7 @@ import { LimitsService } from "./cases/limits.service.js";
 import { ReportService } from "./cases/report.service.js";
 import { TicketsService } from "./tickets/tickets.service.js";
 import { TicketsController } from "./tickets.controllers.js";
+import { DevStorageController } from "./dev.controller.js";
 
 export interface AppDeps {
   config: AppConfig;
@@ -73,6 +71,8 @@ export class AppModule {
         KybController, BankAccountsController, MoneyController, ChainController, StaffTasksController,
         ApplicationsController, NotificationsController, JobsController, WithdrawalsController,
         PricingController, InvoicesController, CasesController, TicketsController,
+        // Local development with in-memory storage only (never in staging or production).
+        ...(deps.config.env === "development" && deps.storage instanceof MemoryStorage ? [DevStorageController] : []),
       ],
       // useFactory, not useValue: Nest serialises useValue providers into the module token,
       // which explodes on large objects such as a PGlite instance.
@@ -128,8 +128,8 @@ export function buildDeps(config: AppConfig): AppDeps {
     // TODO(M-B): SMTP/transactional email provider. Until then email OTP is dev-only.
     email: memorySender,
     identity: config.providers.identity === "jibit" ? new JibitIdentity(http, products.ide) : new MockIdentity(),
-    storage: config.providers.storage === "s3" ? new S3Storage(config.s3) : new MemoryStorage(),
-    registry: config.providers.identity === "jibit" ? new JibitRegistry(http, products.ide) : new MockRegistry(),
+    storage: config.providers.storage === "s3" ? new S3Storage(config.s3) : new MemoryStorage(config.env === "development" ? config.devPublicApiUrl : null),
+    registry: config.providers.identity === "jibit" ? new JibitRegistry(http, products.ide) : new MockRegistry(config.env === "development"),
     cobank: config.providers.cobank === "jibit" ? new JibitCobank(http, products.cobank) : new MockCobank(),
     chain: config.providers.chain === "evm" ? new EvmChain({ ...config.chain }) : new MockChain(),
   };

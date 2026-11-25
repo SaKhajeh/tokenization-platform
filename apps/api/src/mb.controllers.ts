@@ -11,7 +11,7 @@ import { BankAccountsService } from "./bank-accounts/bank-accounts.service.js";
 import { DepositsService } from "./deposits/deposits.service.js";
 import { LedgerService } from "./ledger/ledger.service.js";
 import { ChainService } from "./chain/chain.service.js";
-import { DB, Db } from "./db/db.js";
+import { DB, type Db } from "./db/db.js";
 
 const ALL_STAFF: StaffRole[] = [
   "super_admin", "compliance_officer", "finance_officer", "tokenisation_officer", "analyst", "external_expert", "technical_expert", "committee_member", "fund_manager", "auditor",

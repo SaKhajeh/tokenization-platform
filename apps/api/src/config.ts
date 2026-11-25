@@ -29,6 +29,8 @@ export interface AppConfig {
   documentUrlTtlSec: number;
   /** An idempotency key with no recorded response older than this is treated as abandoned (the request died before committing). */
   idempotencyStaleSec: number;
+  /** Development only: the API base URL the browser uses (through the apps' proxy), for dev upload/download links. */
+  devPublicApiUrl: string;
   s3: { endpoint: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string };
   jibit: {
     baseUrl: string; smsApiKey: string; smsSecret: string; smsSender: string; smsOtpTemplate: string; ideApiKey: string; ideSecret: string;
@@ -97,6 +99,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     documentMaxBytes: 20 * 1024 * 1024,
     documentUrlTtlSec: 300,
     idempotencyStaleSec: Number(process.env.IDEMPOTENCY_STALE_SEC ?? 300),
+    devPublicApiUrl: process.env.DEV_PUBLIC_API_URL ?? "/api/v1",
     s3: {
       endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9000",
       region: process.env.S3_REGION ?? "us-east-1",

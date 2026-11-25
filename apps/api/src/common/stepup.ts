@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, SetMetadata } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { canonicalJson, sha256Hex } from "./crypto.js";
 import { ApiError } from "./errors.js";
 import type { AppRequest } from "./context.js";

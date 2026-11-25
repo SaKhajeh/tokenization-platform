@@ -11,16 +11,16 @@
  */
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { keccak256, toUtf8Bytes } from "ethers";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 import { uuidv7 } from "../common/ids.js";
 import { canonicalJson, decrypt } from "../common/crypto.js";
 import { normalizeDigits } from "../common/validators.js";
-import { REGISTRY, RegistryProvider, LegalIdentity } from "../integrations/registry.js";
+import { REGISTRY, type RegistryProvider, type LegalIdentity } from "../integrations/registry.js";
 import { ChainService } from "../chain/chain.service.js";
 import { DepositsService } from "../deposits/deposits.service.js";
 import { closeWorkflowTasks, staffTask } from "../common/workflow.js";

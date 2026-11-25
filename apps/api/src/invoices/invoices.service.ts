@@ -8,10 +8,10 @@
  */
 import { Inject, Injectable } from "@nestjs/common";
 import { formatMoney } from "@tp/domain";
-import { DB, Db, Queryable } from "../db/db.js";
+import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
-import { actor, AppRequest } from "../common/context.js";
+import { actor, type AppRequest } from "../common/context.js";
 import { LedgerService, insufficientBalance } from "../ledger/ledger.service.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { ApplicationsService } from "../applications/applications.service.js";

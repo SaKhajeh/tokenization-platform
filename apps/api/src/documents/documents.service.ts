@@ -1,12 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { DB, Db } from "../db/db.js";
+import { DB, type Db } from "../db/db.js";
 import { CONFIG } from "../common/tokens.js";
 import type { AppConfig } from "../config.js";
 import { ApiError, Errors } from "../common/errors.js";
 import { uuidv7 } from "../common/ids.js";
 import { AuditService } from "../audit/audit.service.js";
-import { ObjectStorage, STORAGE } from "../integrations/providers.js";
-import { actor, AppRequest } from "../common/context.js";
+import { type ObjectStorage, STORAGE } from "../integrations/providers.js";
+import { actor, type AppRequest } from "../common/context.js";
 
 /** plan/07 §6a: PDF, JPEG, PNG, HEIC (phone camera), Word and Excel (shown in the viewer as PDF; the original is kept). */
 export const ALLOWED_MIME = [
