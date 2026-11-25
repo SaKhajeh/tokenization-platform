@@ -7,6 +7,7 @@
  * Both are versioned and never edited in place: a change adds a new version and the audit log keeps before/after.
  * The per-service price list of D25 (service_catalogue) is retired: the tariff replaced it (doc 07 §6d).
  */
+import { activeExemption } from "../cases/fees.js";
 import { Inject, Injectable } from "@nestjs/common";
 import { buildSpreadSchedule, invoiceTotals, jalaliYearOf, maturityAfterMonths, RateBasis, rateCompare, seriesEconomics, WaterfallOrder } from "@tp/domain";
 import { DB, type Db, type Queryable } from "../db/db.js";
@@ -129,6 +130,7 @@ export class PricingService {
   /** The financing application fee from the current tariff (D-C13). Returns null when it is zero. */
   async issueInvoice(q: Queryable, i: { orgId: string; linkedType: string; linkedId: string; chargePoint: ChargePoint; actorId: string | null; today: string }) {
     const t = await currentTariff(q);
+    if (await activeExemption(q, i.orgId, "after_screening")) return null; // exempted by the fund manager
     const amount = BigInt(t?.application_fee ?? 0);
     if (amount === 0n) return null;
     const p = await this.policy(q);

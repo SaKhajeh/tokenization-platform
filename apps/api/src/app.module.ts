@@ -43,6 +43,7 @@ import { PricingController, InvoicesController } from "./pricing.controllers.js"
 import { CasesController } from "./cases.controllers.js";
 import { CasesService } from "./cases/cases.service.js";
 import { CommentsService } from "./cases/comments.service.js";
+import { FundToolsService } from "./cases/fund-tools.service.js";
 import { LimitsService } from "./cases/limits.service.js";
 import { ReportService } from "./cases/report.service.js";
 import { TicketsService } from "./tickets/tickets.service.js";
@@ -108,6 +109,7 @@ export class AppModule {
         CasesService,
         CommentsService,
         LimitsService,
+        FundToolsService,
         ReportService,
         TicketsService,
         InvoicesService,

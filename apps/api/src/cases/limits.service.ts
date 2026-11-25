@@ -12,7 +12,7 @@
  *                 ceilings for the report. The norm usage ledger draws it down (amount ÷ (Ra × Re)).
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { ActivityType, addJalaliMonths, DEFAULT_SCORING_METHOD, invoiceTotals, jalaliYearOf, LIMIT_VALIDITY_MONTHS, ROUND, RoundState, scoreCase, ScoringMethod, ScoringInputError, toFinancialYear, toRials, transition, usageLedger, validateScoringMethod, VISIT, VisitState, checklistItem, COLLATERAL_CLASSES, isoFromUtcDate } from "@tp/domain";
+import { ActivityType, addJalaliMonths, DEFAULT_SCORING_METHOD, invoiceTotals, jalaliYearOf, LIMIT_VALIDITY_MONTHS, ROUND, RoundState, scoreCase, ScoringMethod, ScoringInputError, toFinancialYear, toRials, transition, usageLedger, validateScoringMethod, VISIT, VisitState, checklistItem, COLLATERAL_CLASSES, isoFromUtcDate, scoringYears } from "@tp/domain";
 import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -256,8 +256,10 @@ export class LimitsService {
     return missing;
   }
 
-  private compute(c: any, fin: any[], method: ScoringMethod, input: ScoreInput) {
-    const years = [c.latest_fiscal_year, c.latest_fiscal_year - 1, c.latest_fiscal_year - 2].map((y) => toFinancialYear(fin.find((r) => r.fiscal_year === y)?.verified ?? {}));
+  compute(c: any, fin: any[], method: ScoringMethod, input: ScoreInput) {
+    // the three latest full years (a balance-sheet-only latest year is skipped), as the fund's method needs
+    const latestType = fin.find((r) => r.fiscal_year === c.latest_fiscal_year)?.statement_type;
+    const years = scoringYears(c.latest_fiscal_year, latestType).map((y) => toFinancialYear(fin.find((r) => r.fiscal_year === y)?.verified ?? {}));
     try {
       return scoreCase({ activityType: input.activity_type, years: years as any, guarantee: input.guarantee, facility: input.facility ?? undefined }, method);
     } catch (e) {
@@ -276,7 +278,7 @@ export class LimitsService {
         if (missing.length) throw err.notReady(missing);
       }
       const method = await this.method(q);
-      const fin = (await q.query(`select fiscal_year, verified from case_financials where case_id = $1`, [caseId])).rows;
+      const fin = (await q.query(`select fiscal_year, verified, statement_type from case_financials where case_id = $1`, [caseId])).rows;
       const result = this.compute(c, fin, method, input);
       let round = (await q.query(`select * from assessment_rounds where case_id = $1 and state in ('preparing','sent_back') order by round_no desc limit 1 for update`, [caseId])).rows[0];
       const judgement = { ...input.guarantee, reasons: input.reasons };

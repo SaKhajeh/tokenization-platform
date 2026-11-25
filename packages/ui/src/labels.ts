@@ -138,7 +138,7 @@ export const ORG_ROLE_FA: Record<string, string> = { org_admin: "مدیر ساز
 export const STAFF_ROLE_FA: Record<string, string> = {
   super_admin: "مدیر سامانه", compliance_officer: "کارشناس انطباق", finance_officer: "کارشناس مالی", tokenisation_officer: "کارشناس توکن‌سازی",
   analyst: "کارشناس اعتباری", external_expert: "کارشناس بیرونی", technical_expert: "کارشناس فنی", committee_member: "عضو کمیته",
-  fund_manager: "مدیر صندوق", auditor: "حسابرس",
+  fund_manager: "مدیر صندوق", credit_manager: "مدیر اعتبارات", auditor: "حسابرس",
 };
 export const ACTIVITY_FA: Record<string, string> = {
   production_contracting: "تولیدی - پیمانکاری", production_line: "تولیدی - خط تولید", production_trading: "تولیدی - بازرگانی",
@@ -149,7 +149,7 @@ export const REVIEW_REASON_FA: Record<string, string> = {
   incomplete: "ناقص است", illegible: "خوانا نیست", no_stamp_or_signature: "مهر یا امضا ندارد", outdated_or_invalid: "قدیمی یا نامعتبر است",
   wrong_person: "مربوط به شخص دیگری است", other: "سایر",
 };
-export const STATEMENT_TYPE_FA: Record<string, string> = { audited: "حسابرسی‌شده", tax_return: "اظهارنامه‌ی مالیاتی", internal: "داخلی" };
+export const STATEMENT_TYPE_FA: Record<string, string> = { audited: "حسابرسی‌شده", tax_return: "اظهارنامه‌ی مالیاتی", internal: "داخلی", balance_sheet: "فقط ترازنامه (آخرین سال)" };
 
 /** Financial summary rows (doc 07 §5), grouped as in the fund's form. Values in million rials. */
 export const FIN_GROUPS: [string, [string, string][]][] = [

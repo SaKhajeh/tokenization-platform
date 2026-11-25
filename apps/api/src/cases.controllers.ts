@@ -1,12 +1,13 @@
 /** HTTP endpoints for the credit case (plan/07 §2–§6). One case per organisation: the applicant side uses /case. */
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from "@nestjs/common";
 import { z } from "zod";
-import { ACTIVITY_TYPES, COMMENT_TARGETS, FINANCIAL_FIELDS, FORM_SECTIONS, NOTE_RECIPIENT_ROLES, REVIEW_REASONS, STATEMENT_TYPES } from "@tp/domain";
+import { ACTIVITY_TYPES, COMMENT_TARGETS, FINANCIAL_FIELDS, FORM_SECTIONS, NOTE_RECIPIENT_ROLES, REVIEW_REASONS, STATEMENT_TYPES, NO_TAX_RETURN_REASONS } from "@tp/domain";
 import { OrgRoute, Req, StaffOnly } from "./common/guards.js";
 import { StepUp } from "./common/stepup.js";
 import { Idempotent } from "./common/idempotency.js";
 import type { AppRequest } from "./common/context.js";
 import { parse, zUuid } from "./common/zod.js";
+import { FundToolsService } from "./cases/fund-tools.service.js";
 import { CasesService } from "./cases/cases.service.js";
 import { CommentsService } from "./cases/comments.service.js";
 import { LimitsService } from "./cases/limits.service.js";
@@ -22,7 +23,7 @@ const zSectionData = z.record(z.unknown()).refine((d) => JSON.stringify(d).lengt
 
 @Controller()
 export class CasesController {
-  constructor(private readonly cases: CasesService, private readonly comments: CommentsService, private readonly limits: LimitsService, private readonly report: ReportService) {}
+  constructor(private readonly cases: CasesService, private readonly comments: CommentsService, private readonly limits: LimitsService, private readonly report: ReportService, private readonly tools: FundToolsService) {}
 
   // ------------------------------------------------------------------ applicant
 
@@ -78,7 +79,7 @@ export class CasesController {
   @OrgRoute("org_admin", "preparer")
   @Idempotent()
   addFile(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
-    const b = parse(z.object({ document_id: zUuid, link_url: z.string().url().max(500).nullable().optional() }), body);
+    const b = parse(z.object({ document_id: zUuid, link_url: z.string().url().max(500).nullable().optional(), alt_reason: z.enum(NO_TAX_RETURN_REASONS).nullable().optional() }), body);
     return this.cases.addFile(req, parse(zItem, p).itemId, b);
   }
 
@@ -215,6 +216,76 @@ export class CasesController {
       recipients: z.array(z.union([z.object({ role: z.enum(NOTE_RECIPIENT_ROLES) }), z.object({ userId: zUuid })])).max(10).optional(),
     }), body);
     return this.comments.staffComment(req, parse(zId, p).id, b as any);
+  }
+
+  // ------------------------------------------------------------------ fund feedback 2026-11-25 (master plan §6 item 25)
+
+  /** Templates the fund offers for checklist items (e.g. the lease agreement), with download links. */
+  @Get("case/templates")
+  @OrgRoute()
+  caseTemplates() {
+    return this.tools.templates();
+  }
+
+  @Get("admin/checklist-templates")
+  @StaffOnly("analyst", "fund_manager", "compliance_officer", "super_admin")
+  adminTemplates() {
+    return this.tools.templates();
+  }
+
+  @Post("admin/checklist-templates/:code/upload-url")
+  @StaffOnly("fund_manager", "credit_manager", "super_admin")
+  templateUpload(@Req() req: AppRequest, @Param("code") code: string, @Body() body: unknown) {
+    const b = parse(z.object({ filename: z.string().min(1).max(200), mime: z.string().max(120), size: z.number().int().positive().max(20 * 1024 * 1024) }), body);
+    return this.tools.templateUpload(req, parse(z.string().regex(/^\d-\d$/), code), b);
+  }
+
+  @Post("admin/checklist-templates/:code/complete")
+  @StaffOnly("fund_manager", "credit_manager", "super_admin")
+  @HttpCode(200)
+  templateComplete(@Req() req: AppRequest, @Param("code") code: string, @Body() body: unknown) {
+    const b = parse(z.object({ document_id: zUuid, sha256: z.string().regex(/^[0-9a-f]{64}$/) }), body);
+    return this.tools.templateComplete(req, parse(z.string().regex(/^\d-\d$/), code), b.document_id, b.sha256);
+  }
+
+  /** مدیر اعتبارات divides cases between analysts. */
+  @Post("admin/cases/:id/assign")
+  @StaffOnly("credit_manager")
+  @HttpCode(200)
+  assign(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.tools.assign(req, parse(zId, p).id, parse(z.object({ analyst_id: zUuid }), body).analyst_id);
+  }
+
+  @Get("admin/orgs/:id/fee-exemptions")
+  @StaffOnly("fund_manager", "credit_manager", "finance_officer", "analyst", "auditor")
+  exemptions(@Param() p: unknown) {
+    return this.tools.exemptions(parse(zId, p).id);
+  }
+
+  /** The fund manager exempts a company from a fee in advance (e.g. a free assessment). */
+  @Post("admin/orgs/:id/fee-exemptions")
+  @StaffOnly("fund_manager")
+  @StepUp()
+  grantExemption(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(z.object({ charge_point: z.enum(["case_submission", "after_screening"]), reason: zText(5, 500) }), body);
+    return this.tools.grantExemption(req, parse(zId, p).id, b);
+  }
+
+  @Delete("admin/orgs/:id/fee-exemptions/:exemptionId")
+  @StaffOnly("fund_manager")
+  revokeExemption(@Req() req: AppRequest, @Param() p: unknown) {
+    const x = parse(z.object({ id: zUuid, exemptionId: zUuid }), p);
+    return this.tools.revokeExemption(req, x.id, x.exemptionId);
+  }
+
+  /** The fund manager raises or lowers an issued limit through Rc/Ra/Re and the collateral class. */
+  @Post("admin/orgs/:id/credit-limit/adjust")
+  @StaffOnly("fund_manager")
+  @StepUp()
+  adjustLimit(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const b = parse(z.object({ rc: zCoef.optional(), ra: zCoefPositive.optional(), re: zCoefPositive.optional(),
+      collateral: z.enum(["cheque", "mortgage_2", "mortgage_1"]).optional(), reason: zText(5, 1000) }), body);
+    return this.tools.adjustLimit(req, parse(zId, p).id, b);
   }
 
   /** Staff directory for pickers (visit visitor, note recipients): active staff with a role, optionally one role. */
@@ -382,7 +453,7 @@ export class CasesController {
 
   @Post("admin/cases/:id/decision")
   @HttpCode(200)
-  @StaffOnly("fund_manager")
+  @StaffOnly("fund_manager", "credit_manager") // the credit manager may approve limits too (fund feedback 2026-11-25); never the preparer
   @StepUp()
   decide(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
     const b = parse(z.object({

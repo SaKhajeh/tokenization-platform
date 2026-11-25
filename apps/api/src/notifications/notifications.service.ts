@@ -3,6 +3,7 @@
  * In-app rows for every recipient; important events also queue an SMS, sent by the worker through Jibit
  * (production needs one pre-approved Jibit pattern per event key; dev uses the in-memory sender).
  */
+import { formatJalali, VISIT_INSTRUCTIONS_FA } from "@tp/domain";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { DB, type Db, type Queryable } from "../db/db.js";
 import { uuidv7 } from "../common/ids.js";
@@ -73,7 +74,7 @@ export const TEMPLATES = {
   "ticket.escalated": { title: "تیکت بی‌پاسخ", link: (p) => `/admin/tickets/${p.id}`, body: (p) => `تیکت ${p.no} («${p.subject}») از زمان هدف پاسخ گذشته است.` },
   "case.visit_proposed": {
     title: "زمان بازدید پیشنهاد شد", sms: true, link: () => "/case/visit",
-    body: (p) => `صندوق برای بازدید از شرکت (پرونده‌ی ${p.no}) تاریخ ${p.date} ساعت ${p.time} را پیشنهاد داده است. لطفاً در برنامه تأیید کنید یا زمان دیگری بخواهید.`,
+    body: (p) => `صندوق برای بازدید از شرکت (پرونده‌ی ${p.no}) تاریخ ${formatJalali(String(p.date))} ساعت ${p.time} را پیشنهاد داده است. لطفاً در برنامه تأیید کنید یا زمان دیگری بخواهید. ${VISIT_INSTRUCTIONS_FA}`,
   },
   "case.visit_confirmed": { title: "بازدید تأیید شد", link: (p) => `/admin/cases/${p.case_id}`, body: (p) => `متقاضی بازدید پرونده‌ی ${p.no} در ${p.date} ساعت ${p.time} را تأیید کرد.` },
   "case.visit_reminder": {
@@ -81,6 +82,7 @@ export const TEMPLATES = {
     body: (p) => `بازدید پرونده‌ی ${p.no} فردا ساعت ${p.time} است. اصل اجازه‌نامه‌های استعلام و گواهی‌های امضا را آماده‌ی تحویل کنید.`,
   },
   "case.limit_issued": { title: "حد اعتباری شما تعیین شد", sms: true, link: () => "/case/limit", body: (p) => `حد اعتباری پرونده‌ی ${p.no} تعیین شد. جزئیات را در برنامه ببینید.` },
+  "case.limit_adjusted": { title: "حد اعتباری شما به‌روز شد", sms: true, link: () => "/case/limit", body: () => "صندوق حد اعتباری شرکت را بازنگری کرد. حد جدید را در برنامه ببینید." },
   "case.declined": { title: "نتیجه‌ی بررسی پرونده", sms: true, link: () => "/case/limit", body: (p) => `صندوق برای پرونده‌ی ${p.no} حد اعتباری تعیین نکرد. ${p.note}` },
   "case.limit_expired": { title: "اعتبار حد اعتباری به پایان رسید", sms: true, link: () => "/case/limit", body: (p) => `اعتبار حد اعتباری پرونده‌ی ${p.no} به پایان رسید؛ برای تمدید، پرونده را به‌روز کنید.` },
   "case.closed_inactive": { title: "پرونده بسته شد", sms: true, link: () => "/case", body: (p) => `پرونده‌ی ${p.no} به دلیل ${p.days} روز بدون فعالیت بسته شد.` },

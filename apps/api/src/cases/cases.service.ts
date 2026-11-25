@@ -11,7 +11,7 @@
  * scoring rounds, fund-manager approval and the credit limit (part 4).
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { CASE, CASE_EDITABLE, CASE_ITEM, CaseState, checklistItem, casePeople, expectedSlots, FINANCIAL_FIELDS, FORM_SECTIONS, FORM_SECTION_TITLES, FormSection, ITEM_RETURNED, ItemState, jalaliYearOf, reconcileSlots, sectionProblems, statement, toFinancialYear, transition, yearProblems, figureProblems, bankTotals, StatementType } from "@tp/domain";
+import { CASE, CASE_EDITABLE, CASE_ITEM, CaseState, checklistItem, casePeople, expectedSlots, FINANCIAL_FIELDS, FORM_SECTIONS, FORM_SECTION_TITLES, FormSection, ITEM_RETURNED, ItemState, jalaliYearOf, reconcileSlots, sectionProblems, statement, toFinancialYear, transition, yearProblems, figureProblems, bankTotals, StatementType, financialYears } from "@tp/domain";
 import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -36,7 +36,8 @@ const err = {
   doc: () => new ApiError(422, "BAD_DOCUMENT", "Document not found or not uploaded by this organisation", "سند یافت نشد یا بارگذاری آن کامل نشده است."),
   notOptional: () => new ApiError(422, "ITEM_REQUIRED", "This document is required; «not available» is only for optional items", "این مدرک الزامی است؛ گزینه‌ی «ندارم» فقط برای مدارک اختیاری است."),
   linkRequired: () => new ApiError(422, "LINK_REQUIRED", "Paste the report's SMS link too", "پیوند پیامکی گزارش را هم وارد کنید."),
-  year: () => new ApiError(422, "FISCAL_YEAR_OUT_OF_RANGE", "Only the three latest fiscal years are entered", "فقط سه سال مالی آخر وارد می‌شود."),
+  year: () => new ApiError(422, "FISCAL_YEAR_OUT_OF_RANGE", "Only the four latest fiscal years are entered", "فقط چهار سال مالی آخر وارد می‌شود."),
+  balanceSheetYear: () => new ApiError(422, "BALANCE_SHEET_LATEST_ONLY", "Only the latest year may be a balance sheet alone", "فقط آخرین سال مالی می‌تواند تنها ترازنامه باشد."),
   figures: (fields: string[]) => new ApiError(422, "INVALID_FIGURES", "Figures must be whole million rials", "ارقام باید عدد صحیح به میلیون ریال باشد.", { fields }),
   review: (why: string) => new ApiError(409, "REVIEW_NOT_ALLOWED", why, "این بررسی در وضعیت فعلی ممکن نیست."),
   incomplete: (open: unknown[]) => new ApiError(409, "CASE_REVIEW_INCOMPLETE", "Some items are not reviewed or not accepted", "هنوز بعضی مدارک بررسی یا تأیید نشده‌اند.", { open }),
@@ -48,7 +49,7 @@ const err = {
 
 const KEY_IDENTITY = ["legal_name", "legal_form"] as const;
 const editable = (s: CaseState) => (CASE_EDITABLE as readonly string[]).includes(s);
-const yearsOf = (y0: number) => [y0, y0 - 1, y0 - 2];
+const yearsOf = (y0: number) => financialYears(y0);
 
 @Injectable()
 export class CasesService {
@@ -346,7 +347,7 @@ export class CasesService {
           ...(staff ? { original_received_at: i.original_received_at ?? null } : {}),
           files: files.filter((f: any) => f.item_id === i.id).map((f: any) => ({
             id: f.id, document_id: f.document_id, version: f.version, filename: f.filename, mime: f.mime, size: String(f.size_bytes), sha256: f.sha256,
-            link_url: f.link_url, uploaded_at: f.uploaded_at, ...(staff ? { uploaded_by: f.uploaded_by, removed_at: f.removed_at } : {}),
+            link_url: f.link_url, alt_reason: f.alt_reason ?? null, uploaded_at: f.uploaded_at, ...(staff ? { uploaded_by: f.uploaded_by, removed_at: f.removed_at } : {}),
           })),
           review: lastReview("item", i.id),
           comments: thread("item", i.id),
@@ -408,7 +409,7 @@ export class CasesService {
       const current = jalaliYearOf(tehranToday());
       if (year > current || year < current - 3) throw err.year();
       await q.query(`update cases set latest_fiscal_year = $2 where id = $1`, [c.id, year]);
-      await q.query(`delete from case_financials where case_id = $1 and fiscal_year not in ($2, $3, $4)`, [c.id, year, year - 1, year - 2]);
+      await q.query(`delete from case_financials where case_id = $1 and fiscal_year <> all($2::int[])`, [c.id, financialYears(year)]);
       await this.touch(q, c, req.user!.id);
       await this.syncSlots(q, c.id, req.user!.id);
       return this.view(q, (await this.caseById(q, c.id)), false);
@@ -420,6 +421,7 @@ export class CasesService {
       const c = await this.caseOf(q, req.org!.id, true);
       if (!["opened", "in_preparation", "under_review"].includes(c.state)) throw err.locked(c.state);
       if (!yearsOf(c.latest_fiscal_year).includes(year)) throw err.year();
+      if (input.statement_type === "balance_sheet" && year !== c.latest_fiscal_year) throw err.balanceSheetYear();
       const bad = Object.entries(input.figures).filter(([k, v]) => !(FINANCIAL_FIELDS as readonly string[]).includes(k) || !/^-?(0|[1-9]\d{0,14})$/.test(v)).map(([k]) => k);
       if (bad.length) throw err.figures(bad);
       await q.query(
@@ -477,18 +479,21 @@ export class CasesService {
     if (i.state === "not_required" || i.state === "in_review" || i.state === "accepted") throw err.itemLocked(i.state);
   }
 
-  async addFile(req: AppRequest, itemId: string, input: { document_id: string; link_url?: string | null }) {
+  async addFile(req: AppRequest, itemId: string, input: { document_id: string; link_url?: string | null; alt_reason?: string | null }) {
     return this.db.tx(async (q) => {
       const c = await this.caseOf(q, req.org!.id, true);
       const i = await this.itemFor(q, c.id, itemId);
       this.assertItemEditable(c, i);
       const doc = (await q.query(`select id from documents where id = $1 and org_id = $2 and status = 'uploaded'`, [input.document_id, c.org_id])).rows[0];
       if (!doc) throw err.doc();
-      if (checklistItem(i.code)?.withLink && !input.link_url) throw err.linkRequired();
+      const meta = checklistItem(i.code);
+      // A letter with a reason instead of the document (e.g. no tax return for a year) — only where the checklist allows it.
+      if (input.alt_reason && !meta?.altLetterReasons?.includes(input.alt_reason)) throw new ApiError(422, "ALT_LETTER_NOT_ALLOWED", "This item does not accept a letter instead of the document", "برای این مدرک نمی‌توان نامه‌ی جایگزین بارگذاری کرد.");
+      if (meta?.withLink && !input.link_url) throw err.linkRequired();
       if (!i.multi) await q.query(`update case_item_files set removed_at = now(), removed_by = $2 where item_id = $1 and removed_at is null`, [i.id, req.user!.id]);
       const v = Number((await q.query(`select coalesce(max(version), 0) + 1 as v from case_item_files where item_id = $1`, [i.id])).rows[0].v);
       const fid = uuidv7();
-      await q.query(`insert into case_item_files (id, item_id, document_id, version, link_url, uploaded_by) values ($1,$2,$3,$4,$5,$6)`, [fid, i.id, doc.id, v, input.link_url ?? null, req.user!.id]);
+      await q.query(`insert into case_item_files (id, item_id, document_id, version, link_url, uploaded_by, alt_reason) values ($1,$2,$3,$4,$5,$6,$7)`, [fid, i.id, doc.id, v, input.link_url ?? null, req.user!.id, input.alt_reason ?? null]);
       await this.moveItem(q, "case_items", i, "uploaded");
       await this.touch(q, c, req.user!.id);
       await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: "case.file_added", entityType: "case_item", entityId: i.id, after: { code: i.code, slot: i.slot_key, version: v, document_id: doc.id } });

@@ -6,7 +6,7 @@
  * addressed to one or more recipients — a role or a named staff member — who each get a notification and a task.
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { CommentTarget, FINANCIAL_FIELDS, FORM_SECTIONS, NoteRecipient } from "@tp/domain";
+import { CommentTarget, FINANCIAL_FIELDS, FORM_SECTIONS, NoteRecipient, financialYears } from "@tp/domain";
 import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -56,7 +56,7 @@ export class CommentsService {
     if (type === "fin_cell") {
       const [y, field] = id.split(":");
       const year = Number(y);
-      if (![c.latest_fiscal_year, c.latest_fiscal_year - 1, c.latest_fiscal_year - 2].includes(year) || !(FINANCIAL_FIELDS as readonly string[]).includes(field)) throw err.target();
+      if (!financialYears(c.latest_fiscal_year).includes(year) || !(FINANCIAL_FIELDS as readonly string[]).includes(field)) throw err.target();
       return id;
     }
     const i = (await q.query(`select code, label from case_items where id = $1 and case_id = $2`, [id, c.id])).rows[0];

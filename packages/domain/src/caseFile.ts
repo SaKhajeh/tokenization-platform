@@ -87,33 +87,68 @@ export interface ChecklistItem {
   withLink?: boolean;
   /** Carried from registration (KYB). */
   fromKyb?: boolean;
+  /** A step-by-step guide shown with the item (e.g. how to get the Etebarito report). */
+  howTo?: readonly string[];
+  /** The fund provides a template to download (uploaded by staff; see checklist_templates). */
+  template?: boolean;
+  /** Instead of the document, an explanation letter with one of these reasons may be uploaded (e.g. no tax return). */
+  altLetterReasons?: readonly string[];
 }
 
+/** Reasons a company may give, with a letter, instead of a tax return (fund feedback 2026-11-25). */
+export const NO_TAX_RETURN_REASONS = ["newly_established", "inactive", "exempt", "other"] as const;
+export const NO_TAX_RETURN_REASON_FA: Record<(typeof NO_TAX_RETURN_REASONS)[number], string> = {
+  newly_established: "شرکت در آن سال تازه‌تأسیس بوده است", inactive: "شرکت در آن سال فعالیت نداشته (منفعل بوده) است",
+  exempt: "شرکت معاف از ارائه‌ی اظهارنامه بوده است", other: "دلیل دیگر (در نامه توضیح داده شده است)",
+};
+
+/** What the company is told about the site visit (fund feedback 2026-11-25): sent with the proposal and shown in the app. */
+export const VISIT_INSTRUCTIONS_FA =
+  "در بازدید، دو نفر ارزیاب از صندوق و یک نفر متخصص حضور خواهند داشت. حضور مدیرعامل در بازدید الزامی است و در کنار ایشان یکی از نیروهای فنی یا مالی شرکت نیز باید حاضر باشد.";
+
+/** The applicant is told this before the credit assessment starts (fund feedback 2026-11-25). */
+export const ASSESSMENT_DISCLAIMER_FA =
+  "انجام فرایند اعتبارسنجی و تعیین حد اعتباری به معنای اعطای تسهیلات یا ارائه‌ی خدمات صندوق نیست. پس از تعیین حد، هر درخواست تأمین مالی جداگانه بررسی و درباره‌ی آن تصمیم‌گیری می‌شود.";
+
+/** How to get the Etebarito credit report (item 1-5). The fund should confirm these steps against the live site. */
+export const ETEBARITO_HOW_TO = [
+  "به سامانه‌ی اعتباریتو (etebarito.nics.ir) یا وب‌سایت شرکت اعتبارسنجی ایران (ics24.ir) بروید.",
+  "برای گزارش هر شخص: کد ملی همان شخص را وارد کنید. شماره‌ی همراه باید به نام خود او باشد تا کد تأیید برایش ارسال شود.",
+  "برای گزارش شرکت: گزینه‌ی گزارش اشخاص حقوقی را انتخاب کنید و شناسه‌ی ملی شرکت، کد ملی مدیرعامل و شماره‌ی همراه به نام مدیرعامل را وارد کنید.",
+  "کد تأیید پیامک‌شده را وارد کنید و هزینه‌ی گزارش را با درگاه بانکی پرداخت کنید.",
+  "پس از آماده شدن، فایل PDF گزارش را دانلود کنید. پیوندی که با پیامک می‌رسد را هم نگه دارید.",
+  "برای شرکت، مدیرعامل و هر عضو هیئت‌مدیره جداگانه گزارش بگیرید؛ در اینجا فایل هر نفر را در جای خودش بارگذاری کنید و پیوند پیامکی را وارد کنید.",
+] as const;
+
 export const CASE_CHECKLIST: readonly ChecklistItem[] = [
-  { code: "1-2", title: "اجازه‌نامه‌ی استعلام اعتباری", required: "yes", slots: "company_and_people", multi: false, originalRequired: true,
-    guidance: "فرم تکمیل‌شده را چاپ، امضا و مهر کنید و تصویر آن را بارگذاری کنید. اصل فرم باید تحویل شود." },
-  { code: "1-5", title: "گزارش اعتباری (اعتباریتو)", required: "yes", slots: "company_and_people", multi: false, withLink: true,
+  { code: "1-2", title: "اجازه‌نامه‌ی استعلام اعتباری", required: "yes", slots: "company_and_people", multi: false, originalRequired: true, template: true,
+    guidance: "قالب فرم را دانلود کنید؛ آن را تکمیل، چاپ، امضا و مهر کنید و تصویر آن را بارگذاری کنید. اصل فرم باید تحویل شود." },
+  { code: "1-5", title: "گزارش اعتباری (اعتباریتو)", required: "yes", slots: "company_and_people", multi: false, withLink: true, howTo: ETEBARITO_HOW_TO,
     guidance: "برای شرکت، مدیرعامل و هر عضو هیئت‌مدیره گزارش بگیرید؛ فایل هر نفر را جدا بارگذاری کنید و پیوند پیامکی آن را وارد کنید." },
-  { code: "1-6", title: "گواهی امضا", required: "yes", slots: "signatories", multi: false, originalRequired: true,
-    guidance: "از دفترخانه، خطاب به صندوق. اصل گواهی باید تحویل شود." },
+  // 1-6 «گواهی امضا» removed (fund feedback 2026-11-25): the digital signature is taken in the system instead.
   { code: "1-7", title: "گواهی ثنا", required: "yes", slots: "company_and_people", multi: false },
   { code: "2-1", title: "اساسنامه و آگهی تأسیس", required: "yes", slots: "single", multi: false, fromKyb: true, guidance: "همه‌ی صفحات مهر و امضا شده باشد." },
   { code: "2-2", title: "آخرین تغییرات ثبتی (روزنامه‌ی رسمی)", required: "yes", slots: "single", multi: true, fromKyb: true,
     guidance: "آخرین آگهی‌های تغییر نشانی و صاحبان امضای مجاز." },
-  { code: "2-3", title: "شناسنامه و کارت ملی", required: "yes", slots: "people", multi: false, guidance: "همه‌ی صفحات شناسنامه و دو روی کارت ملی." },
-  { code: "2-4", title: "اجاره‌نامه یا سند مالکیت محل", required: "yes", slots: "per_location", multi: false },
-  { code: "3-1", title: "صورت‌های مالی یا اظهارنامه‌ی مالیاتی", required: "yes", slots: "per_year", multi: false,
-    guidance: "صورت مالی حسابرسی‌شده بر اظهارنامه مقدم است؛ شرکت تازه‌تأسیس سال‌هایی را که دارد ارائه کند." },
-  { code: "3-2", title: "تراز آزمایشی سال جاری", required: "yes", slots: "single", multi: false, guidance: "شش‌ستونی، در سطح کل، معین و تفصیلی، مهر و امضا شده." },
+  { code: "2-3", title: "شناسنامه و کارت ملی", required: "yes", slots: "people", multi: true,
+    guidance: "شناسنامه: تصویر همه‌ی صفحات (حتی صفحه‌های خالی). کارت ملی: تصویر هر دو روی کارت (پشت و رو). می‌توانید چند فایل بارگذاری کنید." },
+  { code: "2-4", title: "اجاره‌نامه یا سند مالکیت محل", required: "yes", slots: "per_location", multi: false, template: true,
+    guidance: "برای محل استیجاری، اجاره‌نامه را مطابق قالب صندوق تنظیم کنید (قالب را دانلود کنید)؛ برای محل ملکی، سند مالکیت." },
+  { code: "3-1", title: "صورت‌های مالی", required: "yes", slots: "per_year", multi: true,
+    guidance: "صورت‌های مالی چهار سال اخیر، ترجیحاً حسابرسی‌شده. برای آخرین سال، اگر صورت مالی هنوز آماده نیست، ترازنامه کافی است." },
+  { code: "3-5", title: "اظهارنامه‌ی مالیاتی", required: "yes", slots: "per_year", multi: true, altLetterReasons: NO_TAX_RETURN_REASONS,
+    guidance: "اظهارنامه‌ی مالیاتی هر یک از چهار سال اخیر. اگر برای سالی اظهارنامه ندارید (تازه‌تأسیس، منفعل و مانند آن)، به جای آن نامه‌ای با ذکر دلیل بارگذاری کنید." },
+  { code: "3-2", title: "تراز آزمایشی شش‌ستونی سال جاری", required: "yes", slots: "single", multi: true,
+    guidance: "تراز آزمایشی شش‌ستونی در هر سه سطح کل، معین و تفصیل، مهر و امضا شده. برای هر سطح یک فایل بارگذاری کنید." },
   { code: "3-3", title: "گزارش گردش حساب بانکی", required: "yes", slots: "per_bank", multi: false,
     guidance: "جمع واریز، جمع برداشت و میانگین موجودی با مهر بانک." },
-  { code: "3-4", title: "آخرین لیست بیمه", required: "yes", slots: "single", multi: false, guidance: "لیست و رسید آخرین پرداخت حق بیمه." },
+  { code: "3-4", title: "آخرین لیست بیمه", required: "yes", slots: "single", multi: false, guidance: "آخرین لیست بیمه‌ی کارکنان. رسید پرداخت لازم نیست." },
   { code: "4-1", title: "طرح توجیهی", required: "if_available", slots: "single", multi: false },
   { code: "4-2", title: "پروانه‌ی تأسیس یا بهره‌برداری", required: "if_available", slots: "single", multi: true },
   { code: "4-3", title: "سایر مجوزها، تأییدیه‌ها و استانداردها", required: "if_available", slots: "single", multi: true },
-  { code: "4-4", title: "صفحات اول قراردادهای مهم ۳ سال اخیر", required: "if_available", slots: "single", multi: true,
-    guidance: "صفحاتی که کارفرما، مبلغ و مدت را نشان می‌دهد؛ نام کارفرما می‌تواند پوشانده شود." },
-  { code: "4-5", title: "کاتالوگ یا معرفی محصولات", required: "yes", slots: "single", multi: true },
+  { code: "4-4", title: "صفحات اول قراردادهای مهم ۳ سال اخیر یا فاکتورهای فروش", required: "if_available", slots: "single", multi: true,
+    guidance: "صفحاتی که کارفرما، مبلغ و مدت را نشان می‌دهد (نام کارفرما می‌تواند پوشانده شود)، یا فاکتورهای فروش. هر تعداد فایل لازم است اضافه کنید." },
+  { code: "4-5", title: "کاتالوگ یا معرفی محصولات", required: "yes", slots: "single", multi: true, guidance: "الزامی است. کاتالوگ، بروشور یا معرفی محصولات و خدمات شرکت." },
 ];
 
 export const checklistItem = (code: string) => CASE_CHECKLIST.find((c) => c.code === code);
@@ -168,7 +203,7 @@ export function expectedSlots(ctx: SlotContext): SlotDef[] {
         for (const p of ctx.people.filter((x) => x.signing_right)) add(`person:${p.national_id}`, personLabel(p));
         break;
       case "per_year":
-        for (let i = 0; i < 4; i++) add(`year:${ctx.latestFiscalYear - i}`, `سال مالی ${ctx.latestFiscalYear - i}`, i < 3 ? "yes" : "if_available");
+        for (let i = 0; i < FINANCIAL_YEARS; i++) add(`year:${ctx.latestFiscalYear - i}`, `سال مالی ${ctx.latestFiscalYear - i}`, "yes");
         break;
       case "per_location":
         for (const l of ctx.locations) add(`location:${l.id}`, `${USAGE_FA[l.usage ?? ""] ?? "محل"}${l.address ? ` — ${l.address}` : ""}`);
@@ -320,7 +355,20 @@ export function casePeople(board: Data | undefined): CasePerson[] {
  * They are reported figures, not money held by the platform; the scoring model converts them to numbers.
  */
 export type FinancialFigures = Record<(typeof FINANCIAL_FIELDS)[number], string>;
-export const STATEMENT_TYPES = ["audited", "tax_return", "internal"] as const;
+export const STATEMENT_TYPES = ["audited", "tax_return", "internal", "balance_sheet"] as const;
+
+/** Years of figures and statements asked for (fund feedback 2026-11-25: four; was three). */
+export const FINANCIAL_YEARS = 4;
+/** Fiscal years asked for, latest first. */
+export const financialYears = (latest: number) => Array.from({ length: FINANCIAL_YEARS }, (_, i) => latest - i);
+/**
+ * The three years the scoring method uses (the fund's workbook needs three full years): the latest three, unless the
+ * latest year is only a balance sheet (allowed for the latest year), then the three before it.
+ */
+export function scoringYears(latest: number, latestStatementType: string | null | undefined): [number, number, number] {
+  const y0 = latestStatementType === "balance_sheet" ? latest - 1 : latest;
+  return [y0, y0 - 1, y0 - 2];
+}
 export type StatementType = (typeof STATEMENT_TYPES)[number];
 
 const INT_RE = /^-?(0|[1-9]\d{0,14})$/;

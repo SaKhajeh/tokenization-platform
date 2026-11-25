@@ -64,7 +64,8 @@ export class AccessGuard implements CanActivate {
       mobile: r.mobile,
       email: r.email,
       shahkarStatus: r.shahkar_status,
-      staffRoles: r.staff_roles ?? [],
+      // مدیر اعتبارات leads the analysts: every analyst permission comes with the role.
+      staffRoles: (r.staff_roles ?? []).includes("credit_manager") && !(r.staff_roles ?? []).includes("analyst") ? [...r.staff_roles, "analyst"] : r.staff_roles ?? [],
     };
 
     // ---- staff routes

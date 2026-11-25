@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  bankTotals, CASE, CASE_ITEM, canTransition, casePeople, expectedSlots, FINANCIAL_FIELDS, reconcileSlots, sectionProblems, terminalStates, yearProblems,
+  bankTotals, CASE, CASE_ITEM, CASE_CHECKLIST, scoringYears, financialYears, canTransition, casePeople, expectedSlots, FINANCIAL_FIELDS, reconcileSlots, sectionProblems, terminalStates, yearProblems,
 } from "../src/index.js";
 
 const board = {
@@ -37,11 +37,11 @@ describe("dynamic slots (§3.2)", () => {
   it("company + each director, never non-director shareholders", () => {
     expect(of("1-2")).toEqual(["company", "person:0012345678", "person:0087654321"]);
     expect(of("2-3")).toEqual(["person:0012345678", "person:0087654321"]);
-    expect(of("1-6")).toEqual(["person:0012345678", "person:0087654321"]); // signatories
+    expect(of("1-6")).toEqual([]); // the signature certificate is gone: the digital signature is taken in the system
   });
-  it("per year (Y-3 optional), per location, per bank", () => {
-    expect(slots.filter((s) => s.code === "3-1").map((s) => [s.slotKey, s.required])).toEqual([
-      ["year:1404", "yes"], ["year:1403", "yes"], ["year:1402", "yes"], ["year:1401", "if_available"],
+  it("per year (four years, all required; statements and tax returns), per location, per bank", () => {
+    for (const code of ["3-1", "3-5"]) expect(slots.filter((s) => s.code === code).map((s) => [s.slotKey, s.required])).toEqual([
+      ["year:1404", "yes"], ["year:1403", "yes"], ["year:1402", "yes"], ["year:1401", "yes"],
     ]);
     expect(of("2-4")).toEqual(["location:L1", "location:L2"]);
     expect(of("3-3")).toEqual(["bank:B1"]);
@@ -53,9 +53,9 @@ describe("dynamic slots (§3.2)", () => {
     const fewer = expectedSlots({ ...ctx, people: ctx.people.filter((p) => p.national_id !== "0087654321") });
     const r = reconcileSlots(existing, fewer);
     expect(r.add).toEqual([]);
-    expect(r.drop.map((d) => `${d.code} ${d.slotKey}`)).toEqual(["1-2 person:0087654321", "1-5 person:0087654321", "1-6 person:0087654321", "1-7 person:0087654321", "2-3 person:0087654321"]);
+    expect(r.drop.map((d) => `${d.code} ${d.slotKey}`)).toEqual(["1-2 person:0087654321", "1-5 person:0087654321", "1-7 person:0087654321", "2-3 person:0087654321"]);
     const back = reconcileSlots(existing.map((e) => (r.drop.some((d) => d.id === e.id) ? { ...e, state: "not_required" as const } : e)), expectedSlots(ctx));
-    expect(back.revive).toHaveLength(5);
+    expect(back.revive).toHaveLength(4);
     expect(back.add).toEqual([]);
   });
 });
@@ -116,5 +116,24 @@ describe("visit, rounds, fee region", () => {
     expect(canTransition(VISIT, "confirmed", "done")).toBe(true);
     expect(canTransition(ROUND, "sent_back", "pending_approval")).toBe(true);
     expect(canTransition(ROUND, "approved", "pending_approval")).toBe(false);
+  });
+});
+
+describe("fund feedback 2026-11-25", () => {
+  it("scoring uses the three latest full years; a balance-sheet-only latest year is skipped", () => {
+    expect(scoringYears(1404, "audited")).toEqual([1404, 1403, 1402]);
+    expect(scoringYears(1404, "balance_sheet")).toEqual([1403, 1402, 1401]);
+    expect(financialYears(1404)).toEqual([1404, 1403, 1402, 1401]);
+  });
+  it("checklist: catalogue required, several files for ID papers, trial balance and contracts/invoices, a letter instead of a tax return", () => {
+    const item = (c: string) => CASE_CHECKLIST.find((x) => x.code === c)!;
+    expect(item("4-5").required).toBe("yes");
+    expect(item("2-3").multi && item("3-2").multi && item("4-4").multi).toBe(true);
+    expect(item("4-4").title).toContain("فاکتور");
+    expect(item("3-5").altLetterReasons).toContain("newly_established");
+    expect(item("3-4").guidance).toContain("رسید پرداخت لازم نیست");
+    expect(item("1-5").howTo?.length).toBeGreaterThan(3);
+    expect(item("2-4").template && item("1-2").template).toBe(true);
+    expect(CASE_CHECKLIST.some((x) => x.code === "1-6")).toBe(false);
   });
 });

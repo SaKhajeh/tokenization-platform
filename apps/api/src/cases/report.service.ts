@@ -3,7 +3,7 @@
  * workbook's report asks for, assembled from the form, the items, the visit and the figures — never retyped.
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { casePeople, financialAnalysis, isoFromUtcDate, scoringRatios, statement, toFinancialYear, figureProblems } from "@tp/domain";
+import { casePeople, financialAnalysis, isoFromUtcDate, scoringRatios, statement, toFinancialYear, figureProblems, scoringYears } from "@tp/domain";
 import { DB, type Db } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -87,7 +87,8 @@ export class ReportService {
 
     // ---- figures: verified once locked, otherwise declared; scoring ratios and the analysis sheet
     const fin = (await this.db.query(`select * from case_financials where case_id = $1`, [caseId])).rows;
-    const years = [c.latest_fiscal_year, c.latest_fiscal_year - 1, c.latest_fiscal_year - 2];
+    // the analysis sheet uses the same three years as scoring (a balance-sheet-only latest year is skipped)
+    const years = scoringYears(c.latest_fiscal_year, fin.find((r: any) => r.fiscal_year === c.latest_fiscal_year)?.statement_type);
     const rows = years.map((y) => fin.find((r: any) => r.fiscal_year === y));
     const figures = rows.map((r) => (r?.verified ?? r?.declared) ?? null);
     const complete = figures.every((f) => f && !figureProblems(f).length);
