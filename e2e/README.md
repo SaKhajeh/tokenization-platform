@@ -5,6 +5,7 @@ the whole credit path on a fresh database:
 
 | Script | What it does |
 |---|---|
+| `t0-phone-fit.mjs` | Run after the others: every applicant page at phone width (390 px) must fit the screen — a wider page makes phones zoom out |
 | `t1.mjs` | Applicant (phone size): login with OTP, national code, create the company, purpose, KYB with an introduction letter, submit with OTP |
 | `t2.mjs` | Compliance officer (staff app): KYB review and approval |
 | `t3.mjs` | Applicant: bank account (OTP), all 9 form sections, three years of figures, every document slot, letter signed with OTP, case submitted with OTP |

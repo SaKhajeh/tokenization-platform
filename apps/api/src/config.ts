@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { HDNodeWallet } from "ethers";
 
 /** Hardhat's public test mnemonic: dev/test only, never holds value. */
@@ -80,7 +80,9 @@ const req = (name: string, fallback?: string): string => {
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   const env = (process.env.APP_ENV ?? "development") as AppConfig["env"];
   const prod = env === "production" || env === "staging";
-  const devKey = randomBytes(32);
+  // Development: a fixed key, so data kept between restarts (DATABASE_URL=pglite:./.pgdata) stays readable.
+  // Tests: a random key per run. Staging/production: DATA_ENCRYPTION_KEY is required (never this key).
+  const devKey = env === "development" ? createHash("sha256").update("tp-development-only-data-key").digest() : randomBytes(32);
   const cfg: AppConfig = {
     env,
     port: Number(process.env.PORT ?? 3000),

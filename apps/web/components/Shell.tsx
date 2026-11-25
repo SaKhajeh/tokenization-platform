@@ -21,7 +21,7 @@ export function Shell({ title, action, children, allowNoOrg }: { title?: ReactNo
   const api = useApi();
   const router = useRouter();
   const path = usePathname();
-  const { me, org, loading, switchOrg } = useMe();
+  const { me, org, loading, failed, reload, switchOrg } = useMe();
   const notes = useQuery(me ? `notes:${org?.id}` : null, () => api.get<{ unread: number }>("/notifications?unread=true"));
 
   useEffect(() => {
@@ -29,6 +29,13 @@ export function Shell({ title, action, children, allowNoOrg }: { title?: ReactNo
     if (!loading && me && !allowNoOrg && (me.shahkar_status !== "verified" || me.organisations.length === 0)) router.replace("/onboarding");
   }, [api.signedIn, loading, me, allowNoOrg, router, path]);
 
+  if (failed && !me) return (
+    <div className="auth"><div className="card stack">
+      <h1 className="t-h2">ارتباط برقرار نشد</h1>
+      <p className="t-muted">{failed} چند لحظه بعد دوباره تلاش کنید.</p>
+      <button className="btn btn-primary" onClick={() => reload()}>تلاش دوباره</button>
+    </div></div>
+  );
   if (!api.signedIn || loading || !me) return <div className="auth"><span style={{ color: "#fff" }}>در حال بارگذاری…</span></div>;
 
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
-import { Banner, Button, Card, JalaliDateInput, Select, TextArea, TextInput, Tracker, latin, toman } from "@tp/ui";
+import { Banner, Button, Card, JalaliDateInput, Select, TextArea, TextInput, Tracker, fa, latin, toman } from "@tp/ui";
 import { Shell } from "@/components/Shell";
 import { FilePick } from "@/components/FilePick";
 import { useMe } from "@/lib/me";
@@ -53,8 +53,9 @@ export default function NewApplication() {
         <Link href="/financing">← بازگشت</Link>
         {limit.data && !limit.data.limit && <Banner tone="warning">درخواست تأمین مالی پس از صدور حد اعتباری ممکن است.</Banner>}
         {avail !== null && <Banner tone="info">حد اعتباری قابل استفاده: {toman(avail)}</Banner>}
-        <div className="grid-2" style={{ alignItems: "start", gridTemplateColumns: "minmax(200px, 260px) 1fr" }}>
-          <Card><Tracker steps={STEPS} current={step} /></Card>
+        <div className="wizard">
+          <Card className="wizard-steps"><Tracker steps={STEPS} current={step} /></Card>
+          <p className="wizard-step-line t-small t-muted">مرحله‌ی {fa(step + 1)} از {fa(STEPS.length)}: <strong>{STEPS[step]}</strong></p>
           <Card title={STEPS[step]}>
             <div className="stack">
               {step === 0 && (<>

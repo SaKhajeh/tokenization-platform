@@ -66,3 +66,14 @@
   .fin-table td:first-child { width: 55%; }
 }
 ol.fa-list { list-style-type: persian; }
+
+/* application wizard: steps beside the form on wide screens; on a phone a one-line "step n of 5" above the form */
+.wizard { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.wizard-step-line { display: none; }
+@media (max-width: 719px) {
+  .wizard { grid-template-columns: minmax(0, 1fr); }
+  .wizard-steps { display: none; }
+  .wizard-step-line { display: block; }
+}
+/* never let a grid child force the page wider than the screen */
+.grid-2 > *, .fieldset-grid > * { min-width: 0; }
