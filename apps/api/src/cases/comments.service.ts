@@ -157,4 +157,16 @@ export class CommentsService {
     );
     return r.rows.map((x: any) => ({ ...commentView(x, true), case_id: x.case_id, case_no: x.case_no, org_name: x.legal_name }));
   }
+
+  /** Active staff (id, name, roles) for pickers; mobiles are masked. */
+  async staffDirectory(role?: string) {
+    const r = await this.db.query(
+      `select u.id, u.full_name, u.mobile, array_agg(s.role order by s.role) as roles
+       from users u join staff_roles s on s.user_id = u.id and s.revoked_at is null
+       where u.status = 'active' and ($1::text is null or u.id in (select user_id from staff_roles where role = $1 and revoked_at is null))
+       group by u.id order by u.full_name nulls last, u.mobile`,
+      [role ?? null],
+    );
+    return r.rows.map((x: any) => ({ id: x.id, full_name: x.full_name, mobile: x.mobile ? `${x.mobile.slice(0, 4)}***${x.mobile.slice(-4)}` : null, roles: x.roles }));
+  }
 }

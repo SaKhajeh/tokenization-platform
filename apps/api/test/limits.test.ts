@@ -42,6 +42,12 @@ describe("credit case part 4a: tariff, visit, scoring, approval, credit limit", 
     expect((await submitCase(t, a)).status).toBe(200);
     await acceptAll(t, an, caseId);
 
+    // ---- staff directory for the visitor picker: staff only, filtered by role, mobiles masked
+    const dir = (await t.http.get(`${V}/admin/staff?role=technical_expert`).set(an.auth).expect(200)).body;
+    expect(dir.map((x: any) => x.id)).toEqual([tech.userId]);
+    expect(dir[0]).toMatchObject({ roles: ["technical_expert"], mobile: "0935***0005" });
+    expect((await t.http.get(`${V}/admin/staff`).set(a.admin.auth)).status).toBe(403);
+
     // ---- scoring needs the visit, the originals and locked figures
     const scoreBody = {
       activity_type: "production_line", guarantee: { rc: 0.9, ra: 0.8, re: 0.7 },
@@ -70,10 +76,13 @@ describe("credit case part 4a: tariff, visit, scoring, approval, credit limit", 
     expect((await t.http.post(`${V}/admin/jobs/visit-reminders/run`).set(ops.auth).expect(200)).body).toEqual({ reminded: 0 });
     await t.http.post(`${V}/admin/cases/${caseId}/visit/report`).set(tech.auth).send({ findings: "خط تولید فعال، ۳۰ نفر نیرو، انبار مطابق اظهار." }).expect(200);
     expect((await t.http.get(`${V}/case/visit`).set(a.admin.auth).set(a.org).expect(200)).body.state).toBe("done");
+    expect((await t.http.get(`${V}/admin/cases/${caseId}/visit`).set(an.auth).expect(200)).body).toMatchObject({ state: "done", visit_time: "11:00" });
     const fc = (await t.http.get(`${V}/admin/cases/${caseId}`).set(an.auth).expect(200)).body;
     for (const i of fc.items.filter((x: any) => x.original_required && x.state === "accepted")) {
       await t.http.post(`${V}/admin/cases/${caseId}/items/${i.id}/original-received`).set(tech.auth).expect(200);
     }
+    const after = (await t.http.get(`${V}/admin/cases/${caseId}`).set(an.auth).expect(200)).body;
+    expect(after.items.filter((x: any) => x.original_required && x.state === "accepted").every((x: any) => !!x.original_received_at)).toBe(true);
     const noOrig = fc.items.find((x: any) => x.code === "3-2");
     expect((await t.http.post(`${V}/admin/cases/${caseId}/items/${noOrig.id}/original-received`).set(tech.auth)).body.error.code).toBe("NO_ORIGINAL_NEEDED");
 

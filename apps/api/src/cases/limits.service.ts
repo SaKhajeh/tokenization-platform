@@ -144,6 +144,12 @@ export class LimitsService {
     return visitView(v) ?? null;
   }
 
+  /** Staff: the latest visit of a case (any state), or null. */
+  async staffVisit(caseId: string) {
+    const v = (await this.db.query(`select * from case_visits where case_id = $1 order by proposed_at desc limit 1`, [caseId])).rows[0];
+    return visitView(v) ?? null;
+  }
+
   async confirmVisit(req: AppRequest) {
     return this.db.tx(async (q) => {
       const c = await this.cases.caseOf(q, req.org!.id, true);

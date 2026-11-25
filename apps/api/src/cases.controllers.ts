@@ -217,6 +217,12 @@ export class CasesController {
     return this.comments.staffComment(req, parse(zId, p).id, b as any);
   }
 
+  /** Staff directory for pickers (visit visitor, note recipients): active staff with a role, optionally one role. */
+  @Get("admin/staff")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "finance_officer", "super_admin")
+  staffList(@Query() query: unknown) {
+    return this.comments.staffDirectory(parse(z.object({ role: z.string().max(40).optional() }), query).role);
+  }
   /** «یادداشت‌های داخلی برای شما». */
   @Get("admin/notes")
   @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "super_admin")
@@ -322,6 +328,11 @@ export class CasesController {
     return this.report.report(parse(zId, p).id);
   }
 
+  @Get("admin/cases/:id/visit")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  staffVisit(@Param() p: unknown) {
+    return this.limits.staffVisit(parse(zId, p).id);
+  }
   @Post("admin/cases/:id/visit")
   @StaffOnly("analyst")
   proposeVisit(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {

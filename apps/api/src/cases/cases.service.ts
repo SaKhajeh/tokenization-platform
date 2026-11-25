@@ -343,6 +343,7 @@ export class CasesService {
           id: i.id, code: i.code, title: meta?.title ?? i.request_title, slot_key: i.slot_key, label: i.label, kind: i.kind, required: i.required,
           multi: i.multi, state: i.state, from_kyb: i.from_kyb, guidance: meta?.guidance ?? i.request_message, original_required: !!meta?.originalRequired,
           with_link: !!meta?.withLink,
+          ...(staff ? { original_received_at: i.original_received_at ?? null } : {}),
           files: files.filter((f: any) => f.item_id === i.id).map((f: any) => ({
             id: f.id, document_id: f.document_id, version: f.version, filename: f.filename, mime: f.mime, size: String(f.size_bytes), sha256: f.sha256,
             link_url: f.link_url, uploaded_at: f.uploaded_at, ...(staff ? { uploaded_by: f.uploaded_by, removed_at: f.removed_at } : {}),
