@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAction, useApi, ErrorBanner } from "@tp/client/react";
 import { Button, Card, Check, TextInput, Tracker, latin } from "@tp/ui";
 import { Shell } from "@/components/Shell";
+import { ASSESSMENT_DISCLAIMER_FA } from "@tp/domain/caseFile";
 import { useMe } from "@/lib/me";
 
 /** A-04 identity (Shahkar) → A-05 create organisation → A-05b purpose. KYB follows on /kyb. */
@@ -66,6 +67,7 @@ export default function Onboarding() {
               <Check checked={financing} onValue={setFinancing}>
                 <strong>دریافت تأمین مالی</strong>
                 <div className="t-small t-muted">با ارسال احراز هویت، پرونده‌ی اعتباری شما خودکار باز می‌شود. صندوق پس از بررسی، حد اعتباری تعیین می‌کند.</div>
+                {financing && <div className="t-small" style={{ color: "var(--info-700)", marginTop: 4 }}>{ASSESSMENT_DISCLAIMER_FA}</div>}
               </Check>
               <ErrorBanner error={setPurpose.error} />
               <Button busy={setPurpose.busy} disabled={!invest && !financing} onClick={() => setPurpose.run()}>ادامه: احراز هویت سازمان</Button>

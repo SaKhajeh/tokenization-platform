@@ -3,11 +3,12 @@ import { Fragment, useState } from "react";
 import { useAction, useApi, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, Card, FIN_GROUPS, FIN_TOTALS, STATEMENT_TYPE_FA, TextInput, fa, jdatetime, latin, millions } from "@tp/ui";
 import type { StaffCase } from "@/lib/case";
+import { financialYears } from "@tp/domain/caseFile";
 
 /** S-18: declared vs verified figures per year; each change needs a reason and is kept; lock before scoring (doc 07 §5.2). */
 export function Financials({ c, reload, canEdit }: { c: StaffCase; reload: () => void; canEdit: boolean }) {
   const api = useApi();
-  const years = [c.latest_fiscal_year, c.latest_fiscal_year - 1, c.latest_fiscal_year - 2];
+  const years = financialYears(c.latest_fiscal_year);
   const fin = (y: number) => c.financials.find((f) => f.fiscal_year === y);
   const [edit, setEdit] = useState<{ y: number; k: string; label: string; value: string; reason: string } | null>(null);
   const locked = !!c.financials_locked_at;
@@ -43,7 +44,7 @@ export function Financials({ c, reload, canEdit }: { c: StaffCase; reload: () =>
           <tbody>
             {FIN_GROUPS.map(([g, rows]) => (
               <Fragment key={g}>
-                <tr className="group"><td colSpan={7}>{g}</td></tr>
+                <tr className="group"><td colSpan={years.length * 2 + 1}>{g}</td></tr>
                 {rows.map(([k, label]) => (
                   <tr key={k}>
                     <td>{label}</td>
@@ -63,7 +64,7 @@ export function Financials({ c, reload, canEdit }: { c: StaffCase; reload: () =>
                 ))}
               </Fragment>
             ))}
-            <tr className="group"><td colSpan={7}>جمع‌ها</td></tr>
+            <tr className="group"><td colSpan={years.length * 2 + 1}>جمع‌ها</td></tr>
             {FIN_TOTALS.map(([k, label]) => (
               <tr key={k} className="total"><td>{label}</td>{years.map((y) => {
                 const f = fin(y); const camel = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);

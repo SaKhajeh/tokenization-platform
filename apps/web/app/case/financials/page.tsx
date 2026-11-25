@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FINANCIAL_FIELDS, statement } from "@tp/domain/creditScoring";
-import { toFinancialYear } from "@tp/domain/caseFile";
+import { financialYears, toFinancialYear } from "@tp/domain/caseFile";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, Card, FIN_GROUPS, FIN_TOTALS, STATEMENT_TYPE_FA, Toast, fa, latin, millions } from "@tp/ui";
 import { Shell } from "@/components/Shell";
@@ -19,7 +19,7 @@ export default function FinancialsPage() {
   const { org } = useMe();
   const cs = useQuery(org ? `case:${org.id}` : null, () => api.get<Case>("/case"));
   const c = cs.data;
-  const years = c ? [c.latest_fiscal_year, c.latest_fiscal_year - 1, c.latest_fiscal_year - 2] : [];
+  const years = c ? financialYears(c.latest_fiscal_year) : [];
   const [vals, setVals] = useState<Record<number, Year>>({});
   const [dirty, setDirty] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export default function FinancialsPage() {
   useEffect(() => {
     if (!c) return;
     const v: Record<number, Year> = {};
-    for (const y of [c.latest_fiscal_year, c.latest_fiscal_year - 1, c.latest_fiscal_year - 2]) {
+    for (const y of financialYears(c.latest_fiscal_year)) {
       const row = c.financials.find((f) => f.fiscal_year === y);
       v[y] = row?.declared ? { statement_type: row.statement_type ?? "", figures: { ...empty().figures, ...row.declared } } : empty();
     }
@@ -60,7 +60,8 @@ export default function FinancialsPage() {
     <Shell title="خلاصه‌ی صورت‌های مالی">
       <div className="stack">
         <Link href="/case">← بازگشت به پرونده</Link>
-        <p className="t-muted">ارقام را به <strong>میلیون ریال</strong> و بدون اعشار، مطابق صورت مالی حسابرسی‌شده یا اظهارنامه وارد کنید. زیان را با علامت منفی بنویسید.</p>
+        <p className="t-muted">ارقام <strong>چهار سال اخیر</strong> را به <strong>میلیون ریال</strong> و بدون اعشار، مطابق صورت مالی حسابرسی‌شده یا اظهارنامه وارد کنید. زیان را با علامت منفی بنویسید.</p>
+        <p className="t-small t-muted">اگر صورت مالی آخرین سال هنوز آماده نیست، نوع آن را «فقط ترازنامه» بگذارید و ارقام ترازنامه را وارد کنید؛ در این حالت محاسبه‌ی حد با سه سال پیش از آن انجام می‌شود.</p>
         <ErrorBanner error={cs.error} />
         {c && (
           <Card>
@@ -73,7 +74,7 @@ export default function FinancialsPage() {
                       <select className="select" value={vals[y]?.statement_type ?? ""} disabled={!editable} aria-label={`نوع صورت مالی ${y}`}
                         onChange={(e) => { setVals((v) => ({ ...v, [y]: { ...v[y], statement_type: e.target.value } })); setDirty((d) => new Set(d).add(y)); }}>
                         <option value="" disabled>انتخاب</option>
-                        {Object.entries(STATEMENT_TYPE_FA).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                        {Object.entries(STATEMENT_TYPE_FA).filter(([k]) => k !== "balance_sheet" || y === c.latest_fiscal_year).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                       </select>
                     </td>
                   ))}</tr>

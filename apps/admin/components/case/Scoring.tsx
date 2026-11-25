@@ -1,17 +1,18 @@
 "use client";
 import { useMemo, useState } from "react";
 import { scoreCase, ScoringInputError, toRials, type ActivityType, type ScoringMethod } from "@tp/domain/creditScoring";
-import { toFinancialYear } from "@tp/domain/caseFile";
+import { scoringYears, toFinancialYear } from "@tp/domain/caseFile";
 import { useAction, useApi, useQuery, useStepUp, ErrorBanner } from "@tp/client/react";
 import { ACTIVITY_FA, Banner, Button, COLLATERAL_FA, Card, KV, Select, Status, TextArea, TextInput, dec, fa, jdatetime, latin, pct, toman, tomanShort } from "@tp/ui";
 import type { StaffCase } from "@/lib/case";
+import { AdjustLimit } from "./AdjustLimit";
 
 interface Round { id: string; round_no: number; state: string; method_version: number; activity_type: string; judgement: { rc: number; ra: number; re: number; reasons: Record<string, string> }; result: any; summary?: string | null; prepared_by: string; prepared_at?: string; decision_reason?: string | null }
 const MISSING_FA: Record<string, string> = { financials_not_locked: "ارقام مالی قفل نشده است", visit_not_done: "بازدید انجام نشده است" };
 const three = (x: string) => /^(0(\.\d{1,3})?|1(\.0{1,3})?)$/.test(latin(x));
 
 /** S-19: live credit-limit calculation on the verified figures (the same engine as the server), then the round and its approval. */
-export function Scoring({ c, reload, meId, isAnalyst, isFundManager }: { c: StaffCase; reload: () => void; meId: string; isAnalyst: boolean; isFundManager: boolean }) {
+export function Scoring({ c, reload, meId, isAnalyst, isFundManager, canAdjust }: { c: StaffCase; reload: () => void; meId: string; isAnalyst: boolean; isFundManager: boolean; canAdjust?: boolean }) {
   const api = useApi();
   const stepUp = useStepUp();
   const method = useQuery("method", () => api.get<ScoringMethod>("/admin/scoring-method"));
@@ -24,7 +25,9 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager }: { c: Staf
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
 
-  const years = [c.latest_fiscal_year, c.latest_fiscal_year - 1, c.latest_fiscal_year - 2].map((y) => c.financials.find((f) => f.fiscal_year === y));
+  // the three latest full years, as the server uses them (a balance-sheet-only latest year is skipped)
+  const latestType = c.financials.find((f) => f.fiscal_year === c.latest_fiscal_year)?.statement_type;
+  const years = scoringYears(c.latest_fiscal_year, latestType).map((y) => c.financials.find((f) => f.fiscal_year === y));
   const live = useMemo(() => {
     if (!method.data || !activity || !three(k.rc) || !three(k.ra) || !three(k.re) || years.some((y) => !y?.verified && !y?.declared)) return null;
     try {
@@ -119,7 +122,7 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager }: { c: Staf
               ["دلایل", Object.entries(pending.judgement.reasons ?? {}).map(([x, r]) => `${x.toUpperCase()}: ${r}`).join("؛ ")],
               ["خلاصه‌ی کارشناس", pending.summary ?? "—"],
             ]} />
-            {pending.prepared_by === meId ? <Banner tone="warning">این دور را خودتان آماده کرده‌اید؛ مدیر صندوق دیگری باید تصمیم بگیرد.</Banner> : (<>
+            {pending.prepared_by === meId ? <Banner tone="warning">این دور را خودتان آماده کرده‌اید؛ مدیر اعتبارات یا مدیر صندوق دیگری باید تصمیم بگیرد.</Banner> : (<>
               <TextArea label="یادداشت برای متقاضی (اختیاری)" value={note} onValue={setNote} rows={2} hint="ضرایب به متقاضی نشان داده نمی‌شود." />
               <TextArea label="دلیل (برای بازگشت یا رد)" value={reason} onValue={setReason} rows={2} />
               <ErrorBanner error={decide.error} />
@@ -132,6 +135,8 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager }: { c: Staf
           </div>
         </Card>
       )}
+
+      {canAdjust && c.state === "limit_issued" && <AdjustLimit c={c} round={rounds.data?.find((r) => r.state === "approved")} reload={reload} />}
 
       <Card title="دورهای محاسبه">
         <ErrorBanner error={rounds.error} />

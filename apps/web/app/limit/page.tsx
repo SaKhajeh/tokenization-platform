@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useApi, useQuery, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, COLLATERAL_FA, Card, Empty, KV, Progress, jdate, toman, tomanShort } from "@tp/ui";
 import { Shell } from "@/components/Shell";
+import { ASSESSMENT_DISCLAIMER_FA } from "@tp/domain/caseFile";
 import { useMe } from "@/lib/me";
 import type { Limit } from "@/lib/case";
 
@@ -37,6 +38,7 @@ export default function LimitPage() {
               </Card>
             </div>
             {q.data!.note && <Banner tone="info">یادداشت صندوق: {q.data!.note}</Banner>}
+            <p className="t-small t-muted">{ASSESSMENT_DISCLAIMER_FA}</p>
             <Link href="/applications/new"><Button>درخواست تأمین مالی</Button></Link>
           </>
         )}

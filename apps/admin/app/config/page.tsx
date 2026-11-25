@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAction, useApi, useQuery, useStepUp, ErrorBanner } from "@tp/client/react";
 import { ACTIVITY_FA, Button, COLLATERAL_FA, Card, JalaliDateInput, KV, Tabs, TextArea, TextInput, Toast, dec, fa, jdate, jdatetime, latin, pct, toman } from "@tp/ui";
 import { Shell } from "@/components/Shell";
+import { CASE_CHECKLIST } from "@tp/domain/caseFile";
 import { useStaff } from "@/lib/me";
 
 interface Tariff { version: number; effective_from: string; assessment_fee_tehran: string; assessment_fee_outside: string; application_fee: string; servicing_fee_bps: number; investor_fee_bps: number; platform_share_bps: number; note: string | null; created_at: string }
@@ -17,7 +18,7 @@ export default function Config() {
   const api = useApi();
   const stepUp = useStepUp();
   const { has } = useStaff();
-  const [tab, setTab] = useState<"tariff" | "policy" | "method">("tariff");
+  const [tab, setTab] = useState<"tariff" | "policy" | "method" | "templates">("tariff");
   const t = useQuery("tariffs", () => api.get<{ current: Tariff | null; history: Tariff[] }>("/admin/tariffs"));
   const p = useQuery(tab === "policy" ? "policy" : null, () => api.get<Policy>("/admin/pricing/policy"));
   const m = useQuery(tab === "method" ? "method" : null, () => api.get<Method>("/admin/scoring-method"));
@@ -40,7 +41,8 @@ export default function Config() {
   return (
     <Shell title="تنظیمات صندوق">
       <div className="stack">
-        <Tabs tabs={[["tariff", "تعرفه‌ی کارمزد"], ["policy", "سیاست نرخ"], ["method", "روش محاسبه‌ی حد"]]} value={tab} onChange={setTab} />
+        <Tabs tabs={[["tariff", "تعرفه‌ی کارمزد"], ["policy", "سیاست نرخ"], ["method", "روش محاسبه‌ی حد"], ["templates", "قالب مدارک"]]} value={tab} onChange={setTab} />
+        {tab === "templates" && <Templates canEdit={has("fund_manager", "credit_manager", "super_admin")} />}
         {tab === "tariff" && (
           <div className="grid-2" style={{ alignItems: "start" }}>
             <Card title={t.data?.current ? `تعرفه‌ی جاری — نسخه‌ی ${fa(t.data.current.version)}` : "تعرفه‌ای ثبت نشده است"}>
@@ -102,5 +104,45 @@ export default function Config() {
       </div>
       <Toast message={toast} onDone={() => setToast(null)} />
     </Shell>
+  );
+}
+
+/** Templates the fund offers for checklist items (e.g. the lease agreement); applicants download them next to the item. */
+function Templates({ canEdit }: { canEdit: boolean }) {
+  const api = useApi();
+  const q = useQuery("templates", () => api.get<{ code: string; title: string; filename: string; url: string; updated_at: string }[]>("/admin/checklist-templates"));
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const upload = async (code: string, file: File) => {
+    setBusy(code); setErr(null);
+    try {
+      const up = await api.post<{ document_id: string; upload_url: string; headers: Record<string, string> }>(`/admin/checklist-templates/${code}/upload-url`, { filename: file.name, mime: file.type, size: file.size });
+      const put = await fetch(up.upload_url, { method: "PUT", headers: up.headers, body: file });
+      if (!put.ok) throw new Error("upload");
+      const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      await api.post(`/admin/checklist-templates/${code}/complete`, { document_id: up.document_id, sha256: sha });
+      q.reload();
+    } catch (e: any) { setErr(e?.messageFa ?? "بارگذاری قالب انجام نشد."); } finally { setBusy(null); }
+  };
+  const ITEMS: [string, string][] = CASE_CHECKLIST.filter((i) => i.template).map((i) => [i.code, i.title]);
+  return (
+    <Card title="قالب‌هایی که متقاضی دانلود می‌کند">
+      {err && <p className="field-error">{err}</p>}
+      <ul className="list">{ITEMS.map(([code, title]) => {
+        const t = q.data?.find((x) => x.code === code);
+        return (
+          <li key={code}>
+            <div className="stack-sm"><span>{title} <span className="t-small t-muted ltr">{code}</span></span>
+              <span className="t-small t-muted">{t ? <>فعلی: <a href={t.url} target="_blank" rel="noreferrer">{t.filename}</a> — {jdatetime(t.updated_at)}</> : "هنوز قالبی بارگذاری نشده است."}</span></div>
+            {canEdit && (
+              <label className="btn btn-outline btn-sm" style={{ cursor: "pointer" }}>
+                {busy === code ? "در حال بارگذاری…" : t ? "جایگزینی قالب" : "بارگذاری قالب"}
+                <input type="file" hidden accept=".pdf,.docx" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(code, f); }} />
+              </label>
+            )}
+          </li>
+        );
+      })}</ul>
+    </Card>
   );
 }

@@ -8,6 +8,7 @@ import { Shell } from "@/components/Shell";
 import { useMe } from "@/lib/me";
 import { EDITABLE, blockerText, type Case } from "@/lib/case";
 import { SECTIONS, SECTION_ORDER } from "@/lib/sections";
+import { ASSESSMENT_DISCLAIMER_FA, VISIT_INSTRUCTIONS_FA } from "@tp/domain/caseFile";
 
 const STAGES = ["تکمیل پرونده", "بررسی مدارک", "بازدید و تأیید ارقام", "محاسبه‌ی حد", "تأیید مدیر صندوق", "حد اعتباری"];
 const stageOf = (s: string) => ({ opened: 0, in_preparation: 0, returned: 0, under_review: 0, submitted: 1, resubmitted: 1, document_review: 1, documents_complete: 2, scoring: 3, sent_back_to_analyst: 3, pending_approval: 4, limit_issued: 5 } as Record<string, number>)[s] ?? 0;
@@ -61,6 +62,7 @@ export default function CasePage() {
     <Shell title="پرونده‌ی اعتباری" action={c ? <Status kind="case" value={c.state} /> : null}>
       {!c ? <ErrorBanner error={cs.error} /> : (
         <div className="stack">
+          <Banner tone="info"><strong>توجه:</strong> {ASSESSMENT_DISCLAIMER_FA}</Banner>
           <div className="grid-2" style={{ alignItems: "start" }}>
             <Card>
               <KV rows={[["شماره‌ی پرونده", <span key="n" className="ltr">{c.case_no}</span>], ["آخرین سال مالی", fa(c.latest_fiscal_year)], ["تاریخ ارسال", jdate(c.submitted_at)]]} />
@@ -74,6 +76,7 @@ export default function CasePage() {
               {visit.data && (
                 <Card title="بازدید از شرکت" action={<Status kind="visit" value={visit.data.state} />}>
                   <p>{jdate(visit.data.visit_date)}، ساعت <span className="ltr">{fa(visit.data.visit_time)}</span></p>
+                  {["proposed", "confirmed"].includes(visit.data.state) && <p className="review-note" style={{ marginTop: 8 }}>{VISIT_INSTRUCTIONS_FA}</p>}
                   {visit.data.state === "proposed" && (
                     <div className="stack" style={{ marginTop: 12 }}>
                       <ErrorBanner error={confirmVisit.error ?? otherDate.error} />

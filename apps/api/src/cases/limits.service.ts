@@ -392,9 +392,9 @@ export class LimitsService {
     return {
       id: l.id, limit: String(l.limit_rials), valid_from: isoFromUtcDate(l.valid_from), valid_to: isoFromUtcDate(l.valid_to),
       used: used.toString(), available: toRials(available).toString(),
-      ceilings: l.ceilings,
+      ceilings: l.ceilings, collateral: l.collateral ?? "cheque", adjusted: !!l.adjusted_from,
       ...(staff ? {
-        norm_ceiling: String(l.norm_ceiling_rials), remaining_norm: toRials(ledger.remaining).toString(), ra, re,
+        norm_ceiling: String(l.norm_ceiling_rials), remaining_norm: toRials(ledger.remaining).toString(), ra, re, adjustment: l.adjustment ?? null,
         usages: ledger.rows.map((r, i) => ({ ...publicUsage(usages[i]), deduction: toRials(r.deduction).toString(), remaining_after: toRials(r.remainingAfter).toString() })),
       } : {}),
     };

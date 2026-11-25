@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
-import { Banner, Button, Card, Chip, REVIEW_REASON_FA, Status, TextInput, Toast, jdatetime } from "@tp/ui";
+import { Banner, Button, Card, Chip, REVIEW_REASON_FA, Select, Status, TextInput, Toast, jdatetime } from "@tp/ui";
+import { checklistItem, NO_TAX_RETURN_REASON_FA } from "@tp/domain/caseFile";
 import { Shell } from "@/components/Shell";
 import { FilePick } from "@/components/FilePick";
 import { useMe } from "@/lib/me";
@@ -18,11 +19,13 @@ export default function DocumentsPage() {
   const [links, setLinks] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [altFor, setAltFor] = useState<Record<string, string>>({}); // item id → chosen reason for a letter instead of the document
+  const templates = useQuery(org ? "templates" : null, () => api.get<{ code: string; filename: string; url: string }[]>("/case/templates"));
   const c = cs.data;
   const canEdit = !!c && EDITABLE.includes(c.state) && ["org_admin", "preparer"].includes(org?.my_role ?? "");
 
-  const addFile = useAction(async (idem, item: CaseItem, docId: string) => {
-    await api.post(`/case/items/${item.id}/files`, { document_id: docId, link_url: links[item.id]?.trim() || undefined }, { idem });
+  const addFile = useAction(async (idem, item: CaseItem, docId: string, altReason?: string) => {
+    await api.post(`/case/items/${item.id}/files`, { document_id: docId, link_url: links[item.id]?.trim() || undefined, ...(altReason ? { alt_reason: altReason } : {}) }, { idem });
     cs.reload(); setToast("فایل اضافه شد");
   });
   const removeFile = useAction(async (_k, item: CaseItem, fileId: string) => { await api.del(`/case/items/${item.id}/files/${fileId}`); cs.reload(); });
@@ -44,7 +47,13 @@ export default function DocumentsPage() {
         {[...groups.entries()].map(([key, list]) => {
           const first = list[0];
           return (
-            <Card key={key} title={<div className="stack-sm"><h2 className="t-h3">{first.title}</h2>{first.guidance && <span className="t-small t-muted">{first.guidance}</span>}</div>}
+            <Card key={key} title={<div className="stack-sm"><h2 className="t-h3">{first.title}</h2>{first.guidance && <span className="t-small t-muted">{first.guidance}</span>}
+              {(() => { const tpl = templates.data?.find((x) => x.code === first.code); return tpl ? <a className="t-small" href={tpl.url} target="_blank" rel="noreferrer">دانلود قالب صندوق ({tpl.filename})</a> : null; })()}
+              {checklistItem(first.code)?.howTo && (
+                <details className="t-small"><summary style={{ cursor: "pointer", color: "var(--primary-700)" }}>راهنمای دریافت گزارش از اعتباریتو</summary>
+                  <ol style={{ margin: "8px 0 0", paddingInlineStart: 18 }}>{checklistItem(first.code)!.howTo!.map((h) => <li key={h}>{h}</li>)}</ol>
+                </details>
+              )}</div>}
               action={<div className="row">{first.required === "if_available" && <Chip>در صورت وجود</Chip>}{first.original_required && <Chip tone="info">تحویل اصل در بازدید</Chip>}</div>}>
               <div>
                 {list.map((i) => {
@@ -62,7 +71,7 @@ export default function DocumentsPage() {
                       )}
                       {i.files.map((f) => (
                         <div key={f.id} className="file-row">
-                          <span>{f.filename} <span className="t-muted t-small">— نسخه‌ی {f.version}، {jdatetime(f.uploaded_at)}</span>{f.link_url && <span className="t-small ltr"> {f.link_url}</span>}</span>
+                          <span>{f.filename} <span className="t-muted t-small">— نسخه‌ی {f.version}، {jdatetime(f.uploaded_at)}</span>{(f as any).alt_reason && <span className="chip chip-warning" style={{ marginInlineStart: 6 }}>نامه به جای مدرک: {NO_TAX_RETURN_REASON_FA[(f as any).alt_reason as keyof typeof NO_TAX_RETURN_REASON_FA]}</span>}{f.link_url && <span className="t-small ltr"> {f.link_url}</span>}</span>
                           {editable && <Button size="sm" variant="ghost" onClick={() => removeFile.run(i, f.id)}>حذف</Button>}
                         </div>
                       ))}
@@ -74,6 +83,15 @@ export default function DocumentsPage() {
                               disabled={i.with_link && !(links[i.id] ?? "").startsWith("http")} />
                           )}
                           {i.required === "if_available" && i.state !== "not_available" && <Button size="sm" variant="ghost" onClick={() => notAvailable.run(i)}>ندارم</Button>}
+                          {checklistItem(i.code)?.altLetterReasons && !i.files.length && (
+                            <div className="row" style={{ alignItems: "flex-end" }}>
+                              <div style={{ minWidth: 260 }}>
+                                <Select label="اظهارنامه ندارم؛ نامه با دلیل بارگذاری می‌کنم" value={altFor[i.id] ?? ""} onValue={(v) => setAltFor({ ...altFor, [i.id]: v })}
+                                  options={Object.entries(NO_TAX_RETURN_REASON_FA)} placeholder="دلیل را انتخاب کنید" />
+                              </div>
+                              {altFor[i.id] && <FilePick size="sm" label="بارگذاری نامه" onUploaded={(doc) => addFile.run(i, doc, altFor[i.id])} />}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
