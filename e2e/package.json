@@ -4,7 +4,7 @@
   "description": "Browser walk-through of both apps against a local API (not part of the npm workspaces; see README)",
   "type": "module",
   "scripts": {
-    "test": "node t1.mjs && node t2.mjs && node t3.mjs && node t4.mjs && node t5.mjs"
+    "test": "node t1.mjs && node t2.mjs && node t3.mjs && node t4.mjs && node t5.mjs && node t6.mjs"
   },
   "dependencies": {
     "jalaali-js": "1.2.8",

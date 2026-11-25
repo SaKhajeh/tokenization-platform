@@ -4,6 +4,8 @@ _Date: 2026-11-15, updated 2026-11-16 · Companion to 02-prd-v1.md (M7, M8, M9),
 
 _Updated 2026-11-24: findings W13 (negative sales refused) and W14 (three-decimal coefficients), both built and tested._
 
+_Updated 2026-11-25 (fund feedback, master plan §6 item 25): decisions D-C23–D-C33 below (§13). They supersede the earlier text on three years of figures, the signature certificate (1-6), the checklist guidance and who approves the limit._
+
 #### Sources studied
 
 | File | What it is |
@@ -409,3 +411,19 @@ Not drawn (follow the same patterns): the other 6 form sections, form-section re
 | Q12 | — | Closed — D-C5: (Ra × Re) |
 | Q13 | Hosting location | Open (D-C14) |
 | Q14 | — | Closed — D-C21: removed |
+
+## 13. Fund feedback, 2026-11-25 (decisions D-C23–D-C33)
+
+| # | Decision | Built as |
+|---|---|---|
+| D-C23 | The fund manager can make any fee free, e.g. the assessment | Per-company exemption in advance for the assessment or application fee (OTP); unpaid invoices waived. Tariff can still be zero for all; single invoices can be waived |
+| D-C24 | The lease agreement template is given to the company to download | Staff upload a template per checklist item (lease 2-4, credit-inquiry form 1-2); download next to the item. **The fund must provide the files** |
+| D-C25 | A guide is written for getting the Etebarito report | Step-by-step guide on item 1-5 (etebarito.nics.ir / ics24.ir; company report with the company ID and the CEO's national code and mobile). The fund should check it against the live site |
+| D-C26 | Birth certificate: all pages; national card: both sides | Guidance on 2-3; several files allowed |
+| D-C27 | Financial statements for 4 years; the latest year can be a balance sheet; tax returns for the last 4 years, or a letter with the reason | Figures for 4 years; "balance sheet only" for the latest year; scoring uses the three latest full years; new item 3-5 (tax return per year) accepting a letter with a reason (newly established, inactive, exempt, other) |
+| D-C28 | Six-column trial balance at the general, subsidiary and detail levels | Guidance on 3-2; several files |
+| D-C29 | No payment receipt for the insurance list | Guidance on 3-4 |
+| D-C30 | Contracts' first pages: several files, sales invoices accepted; catalogue required | 4-4 retitled, several files; 4-5 required |
+| D-C31 | The credit manager divides cases between analysts | New role credit manager; assignment in the case workspace; "my cases" in the queue |
+| D-C32 | Visit message: two assessors and one specialist; the CEO and one technical or financial person must attend. Signature: the digital signature in the system instead of the notary's signature certificate | Text in the visit SMS and in the app. Item 1-6 removed; the request letter and commitment are signed in the system with OTP; multi-signatory signing through Jibit (D21) when integrated |
+| D-C33 | The applicant is told the assessment does not mean financing will be granted. The credit manager (not only the fund manager) approves; the fund manager can raise or lower limits by changing coefficients and collateral | Disclaimer at the purpose choice, on the case and on the limit screen. Limit rounds approved by the credit manager or the fund manager; limit adjustment by the fund manager |

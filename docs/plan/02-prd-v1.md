@@ -6,6 +6,8 @@ _Changes in v1.1 (2026-11-24): aligned with the decisions made since v1.0. **D14
 
 _Updated 2026-11-25: FR-AUTH-5 throttling per purpose; the screens of the credit path are built (apps/web, apps/admin; 01 §6 item 24)._
 
+_Updated 2026-11-25 (fund feedback): new role credit manager (§9 roles: assigns cases, approves limits); FR-FEE: per-company fee exemptions; limit adjustment by the fund manager; four years of figures and tax returns. Details: doc 07 §13, user stories: doc 08._
+
 ---
 
 ## 1. Overview
@@ -90,6 +92,7 @@ Single-user mode (D17): if an org has exactly one active member and single_user_
 | tokenisation_officer | Platform operator | Configure token from approved terms, deploy, mint/burn requests, chain monitoring. |
 | analyst | Fund | Credit case review, financial verification, site visit, scoring rounds; screening and limit checks of applications; DD coordination; monitoring. |
 | technical_expert | Fund | Site visits and technical review of credit cases; receives internal notes (doc 07 §6b). |
+| credit_manager | Fund | مدیر اعتبارات: every analyst permission; assigns cases to analysts; approves credit-limit rounds (never their own) (D-C31, D-C33). |
 | external_expert | Fund (guest) | Access only to the applications assigned to them by task; submits evaluation reports. |
 | committee_member | Fund | Votes on applications. |
 | fund_manager | Fund | Approves credit limits (never the analyst who prepared the round); sets the fee tariff, rate policy and scoring method; final approval of terms and listing; approves withdrawals at or above the threshold, disbursements and payout runs; waives fees; calls guarantees. |

@@ -128,7 +128,7 @@ await save();
 await p.goto(`${WEB}/case/financials`);
 await p.locator("select.select").first().waitFor();
 const years = await p.locator("thead th").allInnerTexts();
-for (const [col, sales] of [[0, 310000], [1, 205000], [2, 138000]]) {
+for (const [col, sales] of [[0, 310000], [1, 205000], [2, 138000], [3, 90000]]) {
   await p.locator("thead select").nth(col).selectOption("audited");
   const set = async (label, v) => p.getByLabel(new RegExp(`^${label} \\d{4}$`)).nth(col).fill(String(v));
   for (const [l, v] of [["موجودی نقد", 116000], ["دارایی‌های ثابت مشهود", 141500], ["حساب‌ها و اسناد پرداختنی تجاری", 60000], ["تسهیلات بلندمدت", 62500], ["سرمایه", 135000], ["فروش خالص", sales], ["بهای تمام‌شده‌ی فروش", Math.round(sales * 0.85)]]) await set(l, v);

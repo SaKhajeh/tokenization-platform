@@ -385,7 +385,7 @@ export class LimitsService {
     if (!l) return null;
     const usages = (await q.query(`select * from limit_usages where org_id = $1 order by created_at`, [orgId])).rows;
     const m = (r: string | bigint) => Number(BigInt(r)) / 1e6;
-    const ledger = usageLedger(m(l.norm_ceiling_rials), usages.map((u: any) => ({ id: u.id, amount: m(u.amount_rials), ra: Number(u.ra), re: Number(u.re), active: u.active })));
+    const ledger = usageLedger(m(l.norm_ceiling_rials) * collateralFactor(l), usages.map((u: any) => ({ id: u.id, amount: m(u.amount_rials), ra: Number(u.ra), re: Number(u.re), active: u.active })));
     const ra = Number(l.ra), re = Number(l.re);
     const available = Math.max(ledger.remaining, 0) * ra * re;
     const used = usages.filter((u: any) => u.active).reduce((s: bigint, u: any) => s + BigInt(u.amount_rials), 0n);
@@ -443,7 +443,7 @@ export class LimitsService {
       const usages = (await q.query(`select * from limit_usages where org_id = $1 order by created_at`, [a.applicant_org_id])).rows;
       const m = (r: string | bigint) => Number(BigInt(r)) / 1e6;
       const amount = BigInt(a.requested_amount);
-      const chk = limitCheck(m(l.norm_ceiling_rials), usages.map((u: any) => ({ id: u.id, amount: m(u.amount_rials), ra: Number(u.ra), re: Number(u.re), active: u.active })),
+      const chk = limitCheck(m(l.norm_ceiling_rials) * collateralFactor(l), usages.map((u: any) => ({ id: u.id, amount: m(u.amount_rials), ra: Number(u.ra), re: Number(u.re), active: u.active })),
         { ra: input.ra, re: input.re, amount: m(amount) });
       const usageId: string | null = null; // nothing is held until the financing is approved
       const id = uuidv7();
@@ -536,4 +536,15 @@ function summarise(r: any) {
     coefficients: r.coefficients, bands: r.bands, avg_margin: r.avgMargin, avg_growth: r.avgGrowth, c1: r.c1, c2: r.c2,
     ratios: r.ratios, method_version: r.methodVersion,
   };
+}
+
+/**
+ * A limit based on stronger collateral than the method's default (the fund manager's adjustment, D-C33) scales the
+ * capacity: available amounts and project ceilings grow by the ratio of that collateral's ceiling to the default's.
+ * Scaling the norm by this factor is exact: each usage then consumes amount / (Ra × Re × factor) of the original norm.
+ */
+function collateralFactor(l: any): number {
+  const g = l.ceilings?.guarantee;
+  const base = Number(g?.cheque ?? 0), chosen = Number(g?.[l.collateral ?? "cheque"] ?? 0);
+  return base > 0 && chosen > 0 ? chosen / base : 1;
 }

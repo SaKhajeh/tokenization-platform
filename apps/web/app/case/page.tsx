@@ -8,7 +8,7 @@ import { Shell } from "@/components/Shell";
 import { useMe } from "@/lib/me";
 import { EDITABLE, blockerText, type Case } from "@/lib/case";
 import { SECTIONS, SECTION_ORDER } from "@/lib/sections";
-import { ASSESSMENT_DISCLAIMER_FA, VISIT_INSTRUCTIONS_FA } from "@tp/domain/caseFile";
+import { ASSESSMENT_DISCLAIMER_FA, FINANCIAL_YEARS, VISIT_INSTRUCTIONS_FA } from "@tp/domain/caseFile";
 
 const STAGES = ["تکمیل پرونده", "بررسی مدارک", "بازدید و تأیید ارقام", "محاسبه‌ی حد", "تأیید مدیر صندوق", "حد اعتباری"];
 const stageOf = (s: string) => ({ opened: 0, in_preparation: 0, returned: 0, under_review: 0, submitted: 1, resubmitted: 1, document_review: 1, documents_complete: 2, scoring: 3, sent_back_to_analyst: 3, pending_approval: 4, limit_issued: 5 } as Record<string, number>)[s] ?? 0;
@@ -112,9 +112,9 @@ export default function CasePage() {
                 <Progress value={itemsDone} max={items.length} label="پیشرفت مدارک" />
                 <div style={{ marginTop: 12 }}><Link href="/case/documents"><Button variant="secondary" block>بارگذاری و مدیریت مدارک</Button></Link></div>
               </Card>
-              <Card title="خلاصه‌ی صورت‌های مالی" action={<span className="t-small t-muted">{fa(finDone)} از ۳ سال</span>}>
-                <Progress value={finDone} max={3} label="پیشرفت صورت‌های مالی" />
-                <div style={{ marginTop: 12 }}><Link href="/case/financials"><Button variant="secondary" block>ورود ارقام سه سال اخیر</Button></Link></div>
+              <Card title="خلاصه‌ی صورت‌های مالی" action={<span className="t-small t-muted">{fa(finDone)} از {fa(FINANCIAL_YEARS)} سال</span>}>
+                <Progress value={finDone} max={FINANCIAL_YEARS} label="پیشرفت صورت‌های مالی" />
+                <div style={{ marginTop: 12 }}><Link href="/case/financials"><Button variant="secondary" block>ورود ارقام چهار سال اخیر</Button></Link></div>
               </Card>
             </div>
           </div>

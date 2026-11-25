@@ -96,6 +96,9 @@ describe("fund feedback 2026-11-25", () => {
     const after = (await t.http.get(`${V}/case/limit`).set(a.admin.auth).set(a.org).expect(200)).body.limit;
     expect(after.limit).toBe(r.limit);
     expect(after.valid_to).toBe(before.valid_to);
+    // nothing used yet: everything is available, on the new collateral basis too
+    expect(after.available).toBe(after.limit);
+    expect(after.collateral).toBe("mortgage_1");
     const rows = (await t.db.query(`select status from credit_limits where org_id = $1 order by created_at`, [a.orgId])).rows.map((x: any) => x.status);
     expect(rows).toEqual(["superseded", "active"]);
     expect((await t.http.get(`${V}/notifications`).set(a.admin.auth).expect(200)).body.items.some((x: any) => x.title === "حد اعتباری شما به‌روز شد")).toBe(true);

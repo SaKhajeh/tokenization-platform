@@ -22,7 +22,7 @@ export default function LimitPage() {
           <>
             <Card dark>
               <div className="stack">
-                <span className="t-small t-muted">حد اعتباری با ضمانت چک و سفته</span>
+                <span className="t-small t-muted">حد اعتباری با {l.collateral && l.collateral !== "cheque" ? COLLATERAL_FA[l.collateral] : "ضمانت چک و سفته"}{l.adjusted ? " (بازنگری‌شده)" : ""}</span>
                 <span className="t-display" title={toman(l.limit)}>{tomanShort(l.limit)}</span>
                 <Progress value={Number(BigInt(l.used) / 10n)} max={Number(BigInt(l.limit) / 10n)} label="استفاده‌شده" />
                 <div className="row-between t-small"><span>استفاده‌شده: {toman(l.used)}</span><span>قابل استفاده: {toman(l.available)}</span></div>

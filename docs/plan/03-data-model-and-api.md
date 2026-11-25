@@ -2,6 +2,8 @@
 
 _Version 1.0 draft · 2026-11-04 · Companion to plan/02-prd-v1.md (FR IDs referenced) · All PRD §16 assumptions confirmed as v1 defaults._
 
+_Updated 2026-11-25 (fund feedback, migration 013): `fee_exemptions`, `checklist_templates`, `case_item_files.alt_reason`, `credit_limits.collateral/adjusted_from/adjustment` (one active limit per round), `case_financials.statement_type` adds `balance_sheet`, staff role `credit_manager`. Endpoints: `GET case/templates`, `GET admin/checklist-templates`, `POST admin/checklist-templates/:code/upload-url|complete`, `POST admin/cases/:id/assign`, `GET|POST|DELETE admin/orgs/:id/fee-exemptions`, `POST admin/orgs/:id/credit-limit/adjust`; `POST case/items/:id/files` takes `alt_reason`; `POST admin/cases/:id/decision` allows the credit manager._
+
 _Updated 2026-11-25: `GET admin/staff`, `GET admin/cases/:id/visit`, `original_received_at` on staff case items, OTP throttling per purpose (`OTP_MAX_STEP_UP_PER_HOUR`), dev-only `dev/storage` routes and `DEV_STAFF` (development only)._
 
 _Updated 2026-11-24: ledger posting map for fees, spread and disbursement (§1.6), applicants instead of issuers and the credit case (§1.8), guarantee policy removed (§1.9), series and terms with both rates (§1.10); `invitation_deliveries` (§1.2), chain outbox and `invitations.deliver` jobs as built (§2), idempotency as built (§3.1). New config: CHAIN_TX_STALE_SEC, IDEMPOTENCY_STALE_SEC._

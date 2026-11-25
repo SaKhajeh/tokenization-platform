@@ -16,7 +16,7 @@ export interface Case {
   commitment: { signed_at: string | null };
   sections: CaseSection[]; items: CaseItem[]; financials: CaseFinancial[]; blockers: Blocker[];
 }
-export interface Limit { case_state: string; limit: null | { id: string; limit: string; valid_from: string; valid_to: string; used: string; available: string; ceilings: { guarantee: Record<string, string>; facility: Record<string, string> } }; note: string | null }
+export interface Limit { case_state: string; limit: null | { id: string; limit: string; valid_from: string; valid_to: string; used: string; available: string; collateral?: string; adjusted?: boolean; ceilings: { guarantee: Record<string, string>; facility: Record<string, string> } }; note: string | null }
 
 export const EDITABLE = ["opened", "in_preparation", "returned", "under_review"];
 export const RETURNED_ITEM = ["needs_fix", "rejected", "requested"];
