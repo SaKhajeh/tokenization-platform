@@ -57,3 +57,12 @@
 
 .repeat-row { border: 1px solid var(--neutral-300); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .fieldset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+
+/* figures table: on a phone one year at a time (year tabs), the full table from 720 px */
+.phone-only { display: none; }
+@media (max-width: 719px) {
+  .phone-only { display: block; }
+  .fin-table .yr-other { display: none; }
+  .fin-table td:first-child { width: 55%; }
+}
+ol.fa-list { list-style-type: persian; }

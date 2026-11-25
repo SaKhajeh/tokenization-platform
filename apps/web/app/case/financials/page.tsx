@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FINANCIAL_FIELDS, statement } from "@tp/domain/creditScoring";
 import { financialYears, toFinancialYear } from "@tp/domain/caseFile";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
-import { Banner, Button, Card, FIN_GROUPS, FIN_TOTALS, STATEMENT_TYPE_FA, Toast, fa, latin, millions } from "@tp/ui";
+import { Banner, Button, Card, FIN_GROUPS, FIN_TOTALS, STATEMENT_TYPE_FA, Tabs, Toast, fa, latin, millions } from "@tp/ui";
 import { Shell } from "@/components/Shell";
 import { useMe } from "@/lib/me";
 import { EDITABLE, type Case } from "@/lib/case";
@@ -23,6 +23,7 @@ export default function FinancialsPage() {
   const [vals, setVals] = useState<Record<number, Year>>({});
   const [dirty, setDirty] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+  const [yi, setYi] = useState(0); // on a phone one year is shown at a time
 
   useEffect(() => {
     if (!c) return;
@@ -65,12 +66,15 @@ export default function FinancialsPage() {
         <ErrorBanner error={cs.error} />
         {c && (
           <Card>
+            <div className="phone-only" style={{ marginBottom: 8 }}>
+              <Tabs tabs={years.map((y, i) => [String(i), `سال ${fa(y)}`] as [string, string])} value={String(yi)} onChange={(v) => setYi(Number(v))} />
+            </div>
             <div className="table-wrap">
               <table className="table fin-table">
                 <thead>
-                  <tr><th>قلم</th>{years.map((y) => <th key={y}>سال {fa(y)}</th>)}</tr>
-                  <tr><td>نوع صورت مالی</td>{years.map((y) => (
-                    <td key={y}>
+                  <tr><th>قلم</th>{years.map((y, i) => <th key={y} className={i !== yi ? "yr-other" : undefined}>سال {fa(y)}</th>)}</tr>
+                  <tr><td>نوع صورت مالی</td>{years.map((y, i) => (
+                    <td key={y} className={i !== yi ? "yr-other" : undefined}>
                       <select className="select" value={vals[y]?.statement_type ?? ""} disabled={!editable} aria-label={`نوع صورت مالی ${y}`}
                         onChange={(e) => { setVals((v) => ({ ...v, [y]: { ...v[y], statement_type: e.target.value } })); setDirty((d) => new Set(d).add(y)); }}>
                         <option value="" disabled>انتخاب</option>
@@ -85,8 +89,8 @@ export default function FinancialsPage() {
                       {rows.map(([k, label]) => (
                         <tr key={k}>
                           <td>{label}</td>
-                          {years.map((y) => (
-                            <td key={y}><input className="input" aria-label={`${label} ${y}`} inputMode="numeric" disabled={!editable} value={vals[y]?.figures[k] ?? ""} onChange={(e) => setFig(y, k, e.target.value)} /></td>
+                          {years.map((y, i) => (
+                            <td key={y} className={i !== yi ? "yr-other" : undefined}><input className="input" aria-label={`${label} ${y}`} inputMode="numeric" disabled={!editable} value={vals[y]?.figures[k] ?? ""} onChange={(e) => setFig(y, k, e.target.value)} /></td>
                           ))}
                         </tr>
                       ))}
@@ -96,10 +100,10 @@ export default function FinancialsPage() {
                   {FIN_TOTALS.map(([k, label]) => (
                     <tr key={k} className="total">
                       <td>{label}</td>
-                      {years.map((y) => {
+                      {years.map((y, i) => {
                         const t = totals(y) as any;
                         const bad = k === "balanceDifference" && t && t[k] !== 0;
-                        return <td key={y} className="num" style={bad ? { color: "var(--danger-700)" } : undefined}>{t ? millions(t[k]) : "—"}</td>;
+                        return <td key={y} className={`num ${i !== yi ? "yr-other" : ""}`} style={bad ? { color: "var(--danger-700)" } : undefined}>{t ? millions(t[k]) : "—"}</td>;
                       })}
                     </tr>
                   ))}

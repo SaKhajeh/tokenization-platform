@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
-import { Banner, Button, Card, Chip, REVIEW_REASON_FA, Select, Status, TextInput, Toast, jdatetime } from "@tp/ui";
+import { Banner, Button, Card, Chip, REVIEW_REASON_FA, Select, Status, TextInput, Toast, fa, jdatetime } from "@tp/ui";
 import { checklistItem, NO_TAX_RETURN_REASON_FA } from "@tp/domain/caseFile";
 import { Shell } from "@/components/Shell";
 import { FilePick } from "@/components/FilePick";
@@ -51,7 +51,7 @@ export default function DocumentsPage() {
               {(() => { const tpl = templates.data?.find((x) => x.code === first.code); return tpl ? <a className="t-small" href={tpl.url} target="_blank" rel="noreferrer">دانلود قالب صندوق ({tpl.filename})</a> : null; })()}
               {checklistItem(first.code)?.howTo && (
                 <details className="t-small"><summary style={{ cursor: "pointer", color: "var(--primary-700)" }}>راهنمای دریافت گزارش از اعتباریتو</summary>
-                  <ol style={{ margin: "8px 0 0", paddingInlineStart: 18 }}>{checklistItem(first.code)!.howTo!.map((h) => <li key={h}>{h}</li>)}</ol>
+                  <ol className="fa-list" style={{ margin: "8px 0 0", paddingInlineStart: 22 }}>{checklistItem(first.code)!.howTo!.map((h) => <li key={h}>{h}</li>)}</ol>
                 </details>
               )}</div>}
               action={<div className="row">{first.required === "if_available" && <Chip>در صورت وجود</Chip>}{first.original_required && <Chip tone="info">تحویل اصل در بازدید</Chip>}</div>}>
@@ -71,7 +71,7 @@ export default function DocumentsPage() {
                       )}
                       {i.files.map((f) => (
                         <div key={f.id} className="file-row">
-                          <span>{f.filename} <span className="t-muted t-small">— نسخه‌ی {f.version}، {jdatetime(f.uploaded_at)}</span>{(f as any).alt_reason && <span className="chip chip-warning" style={{ marginInlineStart: 6 }}>نامه به جای مدرک: {NO_TAX_RETURN_REASON_FA[(f as any).alt_reason as keyof typeof NO_TAX_RETURN_REASON_FA]}</span>}{f.link_url && <span className="t-small ltr"> {f.link_url}</span>}</span>
+                          <span>{f.filename} <span className="t-muted t-small">— نسخه‌ی {fa(f.version)}، {jdatetime(f.uploaded_at)}</span>{(f as any).alt_reason && <span className="chip chip-warning" style={{ marginInlineStart: 6 }}>نامه به جای مدرک: {NO_TAX_RETURN_REASON_FA[(f as any).alt_reason as keyof typeof NO_TAX_RETURN_REASON_FA]}</span>}{f.link_url && <span className="t-small ltr"> {f.link_url}</span>}</span>
                           {editable && <Button size="sm" variant="ghost" onClick={() => removeFile.run(i, f.id)}>حذف</Button>}
                         </div>
                       ))}
