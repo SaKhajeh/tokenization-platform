@@ -150,3 +150,17 @@ export const REVIEW_REASON_FA: Record<string, string> = {
   wrong_person: "مربوط به شخص دیگری است", other: "سایر",
 };
 export const STATEMENT_TYPE_FA: Record<string, string> = { audited: "حسابرسی‌شده", tax_return: "اظهارنامه‌ی مالیاتی", internal: "داخلی" };
+
+/** Financial summary rows (doc 07 §5), grouped as in the fund's form. Values in million rials. */
+export const FIN_GROUPS: [string, [string, string][]][] = [
+  ["دارایی‌های جاری", [["cash", "موجودی نقد"], ["shortInvestments", "سرمایه‌گذاری کوتاه‌مدت"], ["receivables", "حساب‌ها و اسناد دریافتنی تجاری"], ["otherReceivables", "سایر دریافتنی‌ها"], ["inventory", "موجودی کالا"], ["prepayments", "پیش‌پرداخت‌ها"], ["otherCurrentAssets", "سایر دارایی‌های جاری"]]],
+  ["دارایی‌های غیرجاری", [["tangibleFixed", "دارایی‌های ثابت مشهود"], ["intangible", "دارایی‌های نامشهود"], ["longInvestments", "سرمایه‌گذاری بلندمدت"], ["otherNonCurrent", "سایر دارایی‌های غیرجاری"], ["partnersCurrentAsset", "جاری شرکا (بدهکار)"]]],
+  ["بدهی‌های جاری", [["payables", "حساب‌ها و اسناد پرداختنی تجاری"], ["otherPayables", "سایر پرداختنی‌ها"], ["shortLoans", "تسهیلات کوتاه‌مدت"], ["advancesReceived", "پیش‌دریافت‌ها"], ["otherCurrentLiabilities", "سایر بدهی‌های جاری"]]],
+  ["بدهی‌های غیرجاری", [["longLoans", "تسهیلات بلندمدت"], ["longLiabilities", "سایر بدهی‌های بلندمدت"]]],
+  ["حقوق مالکانه", [["capital", "سرمایه"], ["reserves", "اندوخته‌ها"], ["retainedEarnings", "سود (زیان) انباشته"], ["partnersCurrentEquity", "جاری شرکا (بستانکار)"]]],
+  ["سود و زیان", [["sales", "فروش خالص"], ["cogs", "بهای تمام‌شده‌ی فروش"], ["sga", "هزینه‌های اداری، عمومی و فروش"], ["otherOperatingNet", "سایر درآمدها و هزینه‌های عملیاتی (خالص)"], ["financialCosts", "هزینه‌های مالی"], ["nonOperatingIncome", "درآمدهای غیرعملیاتی"], ["nonOperatingExpenses", "هزینه‌های غیرعملیاتی"]]],
+];
+export const FIN_TOTALS: [string, string][] = [
+  ["currentAssets", "جمع دارایی‌های جاری"], ["totalAssets", "جمع دارایی‌ها"], ["currentLiabilities", "جمع بدهی‌های جاری"], ["totalLiabilities", "جمع بدهی‌ها"],
+  ["equity", "جمع حقوق مالکانه"], ["balanceDifference", "اختلاف تراز (باید صفر باشد)"], ["grossProfit", "سود ناخالص"], ["operatingProfit", "سود عملیاتی"], ["profitBeforeTax", "سود قبل از مالیات"],
+];

@@ -237,3 +237,26 @@ export function KV({ rows }: { rows: [ReactNode, ReactNode][] }) {
     </dl>
   );
 }
+
+// ------------------------------------------------------------------ Jalali date (typed as ۱۴۰۴/۰۲/۱۱, stored as ISO)
+import { isoToJalali, jalaliToIso } from "@tp/domain/jalali";
+/** Accepts ISO dates and Jalali strings ("1398/01/15", as the registry returns) and always emits ISO (YYYY-MM-DD). */
+export function JalaliDateInput({ label, value, onValue, hint, error, disabled }: { label: ReactNode; value: string | null | undefined; onValue: (iso: string) => void; hint?: ReactNode; error?: ReactNode; disabled?: boolean }) {
+  const toText = (v: string | null | undefined) => (!v ? "" : /^\d{4}-\d{2}-\d{2}/.test(v) ? isoToJalali(v.slice(0, 10)) : v);
+  const [text, setText] = useState(toText(value));
+  const [bad, setBad] = useState(false);
+  useEffect(() => setText(toText(value)), [value]);
+  return (
+    <Field label={label} hint={hint ?? "مثال: ۱۴۰۴/۰۲/۱۱"} error={error ?? (bad ? "تاریخ را به شکل سال/ماه/روز شمسی وارد کنید." : undefined)}>
+      {(id) => (
+        <input id={id} className="input input-ltr" inputMode="numeric" placeholder="1404/02/11" disabled={disabled} value={text}
+          onChange={(e) => {
+            const t = latin(e.target.value);
+            setText(t);
+            if (!t) { setBad(false); onValue(""); return; }
+            try { onValue(jalaliToIso(t)); setBad(false); } catch { setBad(t.length >= 8); }
+          }} />
+      )}
+    </Field>
+  );
+}
