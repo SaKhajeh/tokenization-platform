@@ -72,11 +72,12 @@ describe("credit case (plan/07)", () => {
     expect(general.prefill).toMatchObject({ legal_name: "شرکت نمونه 82", national_id: a.nationalId, activity_subject: "پژوهش و توسعه فناوری باتری", landline: "02112345678" });
     const board = c.sections.find((s: any) => s.section === "board");
     expect(board.data.people.map((x: any) => [x.national_id, x.roles, x.signing_right])).toEqual([[a.ceoNationalCode, ["ceo"], true], [BOARD_NC, ["board"], false]]);
-    // slots for the company, the CEO and the board member; the signature certificate only for the signatory
+    // slots for the company, the CEO and the board member; no signature certificate (the digital signature is taken in the system)
     const slots = (code: string) => c.items.filter((i: any) => i.code === code).map((i: any) => i.slot_key).sort();
     expect(slots("1-2")).toEqual(["company", `person:${a.ceoNationalCode}`, `person:${BOARD_NC}`].sort());
-    expect(slots("1-6")).toEqual([`person:${a.ceoNationalCode}`]);
+    expect(slots("1-6")).toEqual([]);
     expect(slots("3-1")).toHaveLength(4);
+    expect(slots("3-5")).toHaveLength(4); // tax returns, four years
     expect(c.blockers.map((b: any) => b.code)).toContain("letter_missing");
   });
 
@@ -115,8 +116,10 @@ describe("credit case (plan/07)", () => {
     const r = await t.http.put(`${V}/case/financials/${y0}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: bad }).expect(200);
     expect(r.body.problems).toEqual(["rule:not_balanced:1"]);
     expect((await t.http.put(`${V}/case/financials/${y0}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: { ...bad, cash: "1.5" } })).body.error.code).toBe("INVALID_FIGURES");
-    expect((await t.http.put(`${V}/case/financials/${y0 - 3}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: year(1) })).body.error.code).toBe("FISCAL_YEAR_OUT_OF_RANGE");
-    for (const [i, s] of [[0, 310000], [1, 205000], [2, 138000]] as const) {
+    expect((await t.http.put(`${V}/case/financials/${y0 - 4}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: year(1) })).body.error.code).toBe("FISCAL_YEAR_OUT_OF_RANGE");
+    // only the latest year may be a balance sheet alone
+    expect((await t.http.put(`${V}/case/financials/${y0 - 1}`).set(prep.auth).set(o).send({ statement_type: "balance_sheet", figures: year(205000) })).body.error.code).toBe("BALANCE_SHEET_LATEST_ONLY");
+    for (const [i, s] of [[0, 310000], [1, 205000], [2, 138000], [3, 90000]] as const) {
       await t.http.put(`${V}/case/financials/${y0 - i}`).set(prep.auth).set(o).send({ statement_type: i === 0 ? "audited" : "tax_return", figures: year(s) }).expect(200);
     }
 
@@ -141,11 +144,13 @@ describe("credit case (plan/07)", () => {
     }
     const required = c.items.find((x: any) => x.code === "3-2");
     expect((await t.http.post(`${V}/case/items/${required.id}/not-available`).set(prep.auth).set(o)).body.error.code).toBe("ITEM_REQUIRED");
-    // a new version replaces the old file on a single-file slot
-    const trial = await uploadDoc(t, prep, a.orgId);
-    await t.http.post(`${V}/case/items/${required.id}/files`).set(prep.auth).set(o).set(idem()).send({ document_id: trial }).expect(201);
+    // a new version replaces the old file on a single-file slot (the insurance list); the trial balance keeps several (one per level)
+    const single = c.items.find((x: any) => x.code === "3-4");
+    await t.http.post(`${V}/case/items/${single.id}/files`).set(prep.auth).set(o).set(idem()).send({ document_id: await uploadDoc(t, prep, a.orgId) }).expect(201);
+    await t.http.post(`${V}/case/items/${required.id}/files`).set(prep.auth).set(o).set(idem()).send({ document_id: await uploadDoc(t, prep, a.orgId) }).expect(201);
     c = (await t.http.get(`${V}/case`).set(prep.auth).set(o).expect(200)).body;
-    expect(c.items.find((x: any) => x.id === required.id).files.map((f: any) => f.version)).toEqual([2]);
+    expect(c.items.find((x: any) => x.id === single.id).files.map((f: any) => f.version)).toEqual([2]);
+    expect(c.items.find((x: any) => x.id === required.id).files.map((f: any) => f.version)).toEqual([1, 2]);
     expect(c.blockers).toEqual([]);
 
     // submit: approver/admin with step-up; preparer cannot
@@ -163,7 +168,8 @@ describe("credit case (plan/07)", () => {
     let fc = (await t.http.get(`${V}/admin/cases/${caseId}`).set(an.auth).expect(200)).body;
     expect(fc.assigned_analyst).toBe(an.userId);
     const trialItem = fc.items.find((x: any) => x.id === required.id);
-    expect(trialItem.files.map((f: any) => [f.version, !!f.removed_at])).toEqual([[1, true], [2, false]]); // staff see history
+    const insurance = fc.items.find((x: any) => x.id === single.id);
+    expect(insurance.files.map((f: any) => [f.version, !!f.removed_at])).toEqual([[1, true], [2, false]]); // staff see history of a replaced file
 
     const noMsg = await t.http.post(`${V}/admin/cases/${caseId}/items/${trialItem.id}/review`).set(an.auth).send({ decision: "needs_fix", reason_code: "no_stamp_or_signature" });
     expect(noMsg.body.error.code).toBe("REVIEW_NOT_ALLOWED");

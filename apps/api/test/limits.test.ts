@@ -56,7 +56,7 @@ describe("credit case part 4a: tariff, visit, scoring, approval, credit limit", 
     const notReady = await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(anfm.auth).send(scoreBody);
     expect(notReady.body.error.code).toBe("SCORING_NOT_READY");
     expect(notReady.body.error.details.missing.slice(0, 2)).toEqual(["financials_not_locked", "visit_not_done"]);
-    expect(notReady.body.error.details.missing.filter((m: string) => m.startsWith("original_not_received")).length).toBe(4); // 1-2 × 3, 1-6 × 1
+    expect(notReady.body.error.details.missing.filter((m: string) => m.startsWith("original_not_received")).length).toBe(3); // 1-2 × 3 (the signature certificate is gone)
     await t.http.post(`${V}/admin/cases/${caseId}/financials/lock`).set(an.auth).expect(200);
 
     // ---- visit: propose → applicant asks for another date (ticket) → new proposal → confirm → reminder → report

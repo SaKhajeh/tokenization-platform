@@ -54,7 +54,7 @@ export async function prepareCase(t: TestApp, a: Awaited<ReturnType<typeof appro
   await t.http.put(`${V}/case/sections/general`).set(prep.auth).set(o).send({ data: fullGeneral(c.sections.find((s: any) => s.section === "general").data) }).expect(200);
   for (const [k, v] of Object.entries(sectionData(a.ceoNationalCode, opts.province))) await t.http.put(`${V}/case/sections/${k}`).set(prep.auth).set(o).send({ data: v }).expect(200);
   const y0 = c.latest_fiscal_year;
-  for (const [i, s] of [[0, 310000], [1, 205000], [2, 138000]] as const) {
+  for (const [i, s] of [[0, 310000], [1, 205000], [2, 138000], [3, 90000]] as const) {
     await t.http.put(`${V}/case/financials/${y0 - i}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: year(s) }).expect(200);
   }
   await t.http.put(`${V}/case/letter`).set(prep.auth).set(o).send({ text: "درخواست تأمین مالی حدود ۲۰ میلیارد ریال برای خرید تجهیزات خط تولید حسگر." }).expect(200);

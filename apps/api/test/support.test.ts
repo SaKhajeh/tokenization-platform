@@ -100,7 +100,7 @@ describe("tickets (§6c)", () => {
     const a = await approvedOrg(t, 95, { compliance: co, financing: true });
     const viewer = await addMember(t, a.admin, a.orgId, "09124440095", "viewer");
     const c = (await t.http.get(`${V}/case`).set(a.admin.auth).set(a.org).expect(200)).body;
-    const item = c.items.find((i: any) => i.code === "1-6");
+    const item = c.items.find((i: any) => i.code === "1-7");
 
     // any member can open one, linked to their own case item, with their own attachment
     const doc = await uploadDoc(t, a.admin, a.orgId);

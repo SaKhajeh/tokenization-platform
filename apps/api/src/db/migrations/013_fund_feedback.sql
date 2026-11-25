@@ -42,3 +42,7 @@ alter table credit_limits add column adjustment jsonb;
 -- Existing cases: the checklist changes apply to slots already created.
 update case_items set multi = true where code in ('2-3', '3-1', '3-2', '3-5', '4-4') and kind = 'checklist';
 update case_items set required = 'yes' where code in ('3-1', '4-5') and kind = 'checklist';
+
+-- An adjusted limit keeps the round it came from, so a round may have several limit rows over time (one active).
+alter table credit_limits drop constraint credit_limits_round_id_key;
+create unique index credit_limits_round_active on credit_limits (round_id) where status = 'active';
