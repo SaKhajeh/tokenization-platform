@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useAction, useApi, ErrorBanner } from "@tp/client/react";
-import { Button, Card, Chip, REVIEW_REASON_FA, Select, Status, TextArea, TextInput, jdatetime } from "@tp/ui";
+import { Button, Card, Chip, REVIEW_REASON_FA, Select, Status, TextArea, TextInput, fa, jdatetime } from "@tp/ui";
 import type { Item, StaffCase } from "@/lib/case";
+import { trialBalancePeriod } from "@tp/domain/caseFile";
 
 /** S-17: checklist on one side, the file viewer on the other; accept / needs fix / reject per slot (doc 07 §3.3). Every open is logged. */
 export function Documents({ c, reload, canReview, canOriginal }: { c: StaffCase; reload: () => void; canReview: boolean; canOriginal: boolean }) {
@@ -59,7 +60,7 @@ export function Documents({ c, reload, canReview, canOriginal }: { c: StaffCase;
       </div>
       <div className="stack">
         {current && (
-          <Card title={<div className="stack-sm"><h2 className="t-h3">{current.title} — {current.label}</h2>{current.guidance && <span className="t-small t-muted">{current.guidance}</span>}</div>}
+          <Card title={<div className="stack-sm"><h2 className="t-h3">{current.title} — {current.label}</h2>{current.guidance && <span className="t-small t-muted">{current.guidance}</span>}{current.code === "3-2" && <span className="t-small">دوره‌ی مورد انتظار: {fa(trialBalancePeriod(new Date(Date.now() + 3.5 * 3600_000).toISOString().slice(0, 10)).label)}</span>}</div>}
             action={<div className="row">{current.original_required && <Chip tone="info">اصل در بازدید</Chip>}{current.from_kyb && <Chip>از احراز هویت</Chip>}</div>}>
             <div className="stack">
               {current.files.filter((f) => !f.removed_at).map((f) => (

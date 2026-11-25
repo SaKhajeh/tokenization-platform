@@ -122,17 +122,18 @@ describe("fund feedback 2026-11-25", () => {
     await t.http.delete(`${V}/admin/orgs/${a.orgId}/fee-exemptions/${g.id}`).set(fm.auth).expect(200);
   });
 
-  it("staff upload the lease template; applicants download it; a letter can replace a tax return, not other documents", async () => {
-    // template for 2-4 (lease)
-    const body = Buffer.from("%PDF-1.4 lease template");
-    const up = (await t.http.post(`${V}/admin/checklist-templates/2-4/upload-url`).set(fm.auth).send({ filename: "lease.pdf", mime: "application/pdf", size: body.length }).expect(201)).body;
+  it("staff upload a template (credit-inquiry form); applicants download it; the lease has none; a letter can replace a tax return, not other documents", async () => {
+    // template for 1-2 (credit-inquiry permission form); the lease (2-4) has no template
+    const body = Buffer.from("%PDF-1.4 inquiry form template");
+    const up = (await t.http.post(`${V}/admin/checklist-templates/1-2/upload-url`).set(fm.auth).send({ filename: "inquiry-form.pdf", mime: "application/pdf", size: body.length }).expect(201)).body;
     (t.storage as any).put(up.upload_url.replace("memory://upload/", ""), body.length);
     const sha = createHash("sha256").update(body).digest("hex");
-    await t.http.post(`${V}/admin/checklist-templates/2-4/complete`).set(fm.auth).send({ document_id: up.document_id, sha256: sha }).expect(200);
+    await t.http.post(`${V}/admin/checklist-templates/1-2/complete`).set(fm.auth).send({ document_id: up.document_id, sha256: sha }).expect(200);
+    expect((await t.http.post(`${V}/admin/checklist-templates/2-4/upload-url`).set(fm.auth).send({ filename: "x.pdf", mime: "application/pdf", size: 10 })).body.error.code).toBe("NO_TEMPLATE_FOR_ITEM");
     expect((await t.http.post(`${V}/admin/checklist-templates/3-1/upload-url`).set(fm.auth).send({ filename: "x.pdf", mime: "application/pdf", size: 10 })).body.error.code).toBe("NO_TEMPLATE_FOR_ITEM");
     const a = await approvedOrg(t, 406, { compliance: co, financing: true });
     const list = (await t.http.get(`${V}/case/templates`).set(a.admin.auth).set(a.org).expect(200)).body;
-    expect(list).toEqual([expect.objectContaining({ code: "2-4", filename: "lease.pdf", url: expect.any(String) })]);
+    expect(list).toEqual([expect.objectContaining({ code: "1-2", filename: "inquiry-form.pdf", url: expect.any(String) })]);
 
     // tax return slot: a letter with a reason; not allowed on other items
     const c = (await t.http.get(`${V}/case`).set(a.admin.auth).set(a.org).expect(200)).body;

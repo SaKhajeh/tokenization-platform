@@ -84,12 +84,12 @@ flowchart TD
 - I upload documents into a checklist with one slot per person, year, location or bank account:
   - **financial statements** and **tax returns** for each of the four years — for a year without a tax return I upload a letter and choose the reason (newly established, inactive, exempt, other);
   - **ID papers**: every page of the birth certificate and both sides of the national card, as several files;
-  - **six-column trial balance** at the general, subsidiary and detail levels (one file per level);
+  - **six-column trial balance of the current year up to the end of the last completed season** (the period is shown), at the general, subsidiary and detail levels (one file per level);
   - **insurance list** (no payment receipt);
   - **first pages of important contracts or sales invoices**, as many files as needed;
   - **product catalogue** (required);
   - the **Etebarito credit report** for the company and each director, with a step-by-step guide on getting it;
-  - the **lease** and the **credit-inquiry permission form**, with the fund's template to download (once the fund uploads it).
+  - the **lease** or title deed of each location (no template; it shows the company has a real location), and the **credit-inquiry permission form** (a template may be offered later);
   - There is no signature-certificate document: the digital signature is taken in the system.
 - I write the request letter and sign it with OTP, pay the assessment fee from the balance (unless the fund waives it or exempts the company), accept the commitment and submit with OTP. Until then the case page lists exactly what blocks submission.
 - If the fund sends items back, I see its note on each, fix only those and resubmit; extra documents the fund asks for appear in my checklist.
@@ -124,7 +124,7 @@ flowchart TD
 
 **Technical expert** — files the visit report and records originals received.
 
-**Fund manager** — approves limits as well (never their own round); **adjusts an issued limit** up or down by changing Rc/Ra/Re or the collateral class, with a live preview, a reason and OTP (the old limit is kept in history; the company is notified); **exempts a company from a fee in advance** (assessment or application fee, OTP; unpaid invoices are waived), or waives single invoices; publishes fee tariff versions (a fee can also be set to zero for everyone); uploads the fund's templates for checklist items; approves large withdrawals (10 billion rials and above); edits the scoring method and rate policy **(API only)**.
+**Fund manager** — approves limits as well (never their own round); **adjusts an issued limit** up or down by changing Rc/Ra/Re or the collateral class, with a live preview, a reason and OTP (the old limit is kept in history; the company is notified); **exempts a company from a fee in advance** (assessment or application fee, OTP; unpaid invoices are waived), or waives single invoices; publishes fee tariff versions (a fee can also be set to zero for everyone); uploads templates for checklist items (currently the credit-inquiry form only); approves large withdrawals (10 billion rials and above); edits the scoring method and rate policy **(API only)**.
 
 **Finance officer** — takes withdrawals into the finance queue or rejects them, sends them through Jibit Cobank with OTP; sees invoices; trial balance **(API only)**.
 

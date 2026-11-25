@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  bankTotals, CASE, CASE_ITEM, CASE_CHECKLIST, scoringYears, financialYears, canTransition, casePeople, expectedSlots, FINANCIAL_FIELDS, reconcileSlots, sectionProblems, terminalStates, yearProblems,
+  bankTotals, CASE, CASE_ITEM, CASE_CHECKLIST, scoringYears, financialYears, trialBalancePeriod, canTransition, casePeople, expectedSlots, FINANCIAL_FIELDS, reconcileSlots, sectionProblems, terminalStates, yearProblems,
 } from "../src/index.js";
 
 const board = {
@@ -133,7 +133,18 @@ describe("fund feedback 2026-11-25", () => {
     expect(item("3-5").altLetterReasons).toContain("newly_established");
     expect(item("3-4").guidance).toContain("رسید پرداخت لازم نیست");
     expect(item("1-5").howTo?.length).toBeGreaterThan(3);
-    expect(item("2-4").template && item("1-2").template).toBe(true);
+    expect(item("2-4").template).toBeFalsy(); // no lease template: the lease only shows the company has a real location
+    expect(item("1-2").template).toBe(true);
     expect(CASE_CHECKLIST.some((x) => x.code === "1-6")).toBe(false);
+  });
+});
+
+describe("trial balance period (fund feedback 2026-11-26)", () => {
+  // 2026-07-25 = 3 Mordad 1405 (summer) · 2026-11-25 = 4 Azar 1405 (fall) · 2026-04-10 = 21 Farvardin 1405 (spring) · 2027-03-01 = 10 Esfand 1405 (winter)
+  it("covers the year to the end of the last completed season", () => {
+    expect(trialBalancePeriod("2026-07-25")).toMatchObject({ fiscalYear: 1405, throughMonth: 3, label: "از ابتدای سال 1405 تا پایان خرداد 1405" });
+    expect(trialBalancePeriod("2026-11-25")).toMatchObject({ fiscalYear: 1405, throughMonth: 6 });
+    expect(trialBalancePeriod("2027-03-01")).toMatchObject({ fiscalYear: 1405, throughMonth: 9 });
+    expect(trialBalancePeriod("2026-04-10")).toMatchObject({ fiscalYear: 1404, throughMonth: 12 });
   });
 });

@@ -1,3 +1,4 @@
+import { isoToJalali } from "./jalali.js";
 /**
  * Credit case (پرونده اعتباری) — rules shared by the API and the apps. Spec: plan/07-case-file-and-credit-scoring.md §2–§5.
  *
@@ -132,14 +133,14 @@ export const CASE_CHECKLIST: readonly ChecklistItem[] = [
     guidance: "آخرین آگهی‌های تغییر نشانی و صاحبان امضای مجاز." },
   { code: "2-3", title: "شناسنامه و کارت ملی", required: "yes", slots: "people", multi: true,
     guidance: "شناسنامه: تصویر همه‌ی صفحات (حتی صفحه‌های خالی). کارت ملی: تصویر هر دو روی کارت (پشت و رو). می‌توانید چند فایل بارگذاری کنید." },
-  { code: "2-4", title: "اجاره‌نامه یا سند مالکیت محل", required: "yes", slots: "per_location", multi: false, template: true,
-    guidance: "برای محل استیجاری، اجاره‌نامه را مطابق قالب صندوق تنظیم کنید (قالب را دانلود کنید)؛ برای محل ملکی، سند مالکیت." },
+  { code: "2-4", title: "اجاره‌نامه یا سند مالکیت محل", required: "yes", slots: "per_location", multi: false,
+    guidance: "برای محل استیجاری، اجاره‌نامه‌ی معتبر و برای محل ملکی، سند مالکیت را بارگذاری کنید تا محل فعالیت شرکت مشخص باشد. قالب خاصی لازم نیست." },
   { code: "3-1", title: "صورت‌های مالی", required: "yes", slots: "per_year", multi: true,
     guidance: "صورت‌های مالی چهار سال اخیر، ترجیحاً حسابرسی‌شده. برای آخرین سال، اگر صورت مالی هنوز آماده نیست، ترازنامه کافی است." },
   { code: "3-5", title: "اظهارنامه‌ی مالیاتی", required: "yes", slots: "per_year", multi: true, altLetterReasons: NO_TAX_RETURN_REASONS,
     guidance: "اظهارنامه‌ی مالیاتی هر یک از چهار سال اخیر. اگر برای سالی اظهارنامه ندارید (تازه‌تأسیس، منفعل و مانند آن)، به جای آن نامه‌ای با ذکر دلیل بارگذاری کنید." },
   { code: "3-2", title: "تراز آزمایشی شش‌ستونی سال جاری", required: "yes", slots: "single", multi: true,
-    guidance: "تراز آزمایشی شش‌ستونی در هر سه سطح کل، معین و تفصیل، مهر و امضا شده. برای هر سطح یک فایل بارگذاری کنید." },
+    guidance: "تراز آزمایشی شش‌ستونی سال جاری تا پایان آخرین فصل کامل‌شده، در هر سه سطح کل، معین و تفصیل، مهر و امضا شده. برای هر سطح یک فایل بارگذاری کنید." },
   { code: "3-3", title: "گزارش گردش حساب بانکی", required: "yes", slots: "per_bank", multi: false,
     guidance: "جمع واریز، جمع برداشت و میانگین موجودی با مهر بانک." },
   { code: "3-4", title: "آخرین لیست بیمه", required: "yes", slots: "single", multi: false, guidance: "آخرین لیست بیمه‌ی کارکنان. رسید پرداخت لازم نیست." },
@@ -424,4 +425,22 @@ export function feeRegion(locations: readonly { usage?: string; province?: strin
   const works = rows.filter((r) => r.usage === "factory" || r.usage === "workshop");
   const basis = works.length ? works : rows.filter((r) => r.usage === "head_office");
   return basis.some((r) => (r.province ?? "").trim() === "تهران") ? "tehran" : "outside";
+}
+
+// ------------------------------------------------------------------ trial balance period (fund feedback, 2026-11-26)
+
+const JALALI_MONTH_FA = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
+
+/**
+ * The period the current-year trial balance must cover: from the start of the Jalali year to the end of the last
+ * completed season (Iran's year starts in spring). In summer → to the end of spring (Khordad); in the middle of fall
+ * → to the end of summer (Shahrivar). In spring no season of the new year is complete yet, so it covers the whole
+ * previous year (to the end of Esfand). `today` is a Tehran calendar date (YYYY-MM-DD).
+ */
+export function trialBalancePeriod(today: string): { fiscalYear: number; throughMonth: 3 | 6 | 9 | 12; months: number; label: string } {
+  const [jy, jm] = isoToJalali(today).split("/").map(Number);
+  const done = Math.floor((jm - 1) / 3) * 3; // months of this year in completed seasons: 0, 3, 6 or 9
+  const fiscalYear = done === 0 ? jy - 1 : jy;
+  const throughMonth = (done === 0 ? 12 : done) as 3 | 6 | 9 | 12;
+  return { fiscalYear, throughMonth, months: throughMonth, label: `از ابتدای سال ${fiscalYear} تا پایان ${JALALI_MONTH_FA[throughMonth - 1]} ${fiscalYear}` };
 }
