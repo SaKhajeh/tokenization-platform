@@ -57,7 +57,7 @@ export default function ApplicationReview() {
               <Card title={`${a.applicant.legal_name} — ${a.initiative.title}`}>
                 <KV rows={[
                   ["مبلغ", toman(a.requested_amount)], ["مدت", `${fa(Math.round(a.proposed_duration_days / 30.4))} ماه`],
-                  ["نرخ پیشنهادی متقاضی", `${fa((Number(a.proposed_rate) * 100).toFixed(2).replace(/\.?0+$/, ""))}٪ ${a.proposed_rate_basis === "monthly" ? "ماهانه" : "سالانه"}`],
+                  ["نرخ پیشنهادی متقاضی", `${fa((Number(a.proposed_rate) * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", "٫"))}٪ ${a.proposed_rate_basis === "monthly" ? "ماهانه" : "سالانه"}`],
                   ["طرح", a.initiative.description], ["آغاز طرح", jdate(a.initiative.started_on)], ["پیشرفت", a.initiative.progress_summary],
                   ["محل مصرف", a.use_of_funds], ["بازپرداخت", a.repayment_source], ["تضامین", a.proposed_guarantees.map((g) => `${g.type}: ${g.description}`).join("؛ ")],
                 ]} />

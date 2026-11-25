@@ -19,7 +19,7 @@ npm run dev -w @tp/api            # http://localhost:3000/api/v1
 npm run seed:staff -w @tp/api -- 09121234567 super_admin   # make a staff user (after they log in once)
 npm run worker -w @tp/api         # background jobs: chain outbox (10 s), Cobank deposit poll (2 min)
 npm run seed:fund -w @tp/api -- <شناسه ملی> "<name>" <admin mobile>   # mark the fund org: the single issuer (D14)
-npm test -w @tp/api               # 92 e2e tests on in-memory Postgres (PGlite) — no Docker needed
+npm test -w @tp/api               # 101 e2e tests on in-memory Postgres (PGlite) — no Docker needed
 npm run test:chain -w @tp/api     # + the chain worker against a local node with the real IdentityRegistry
 ```
 

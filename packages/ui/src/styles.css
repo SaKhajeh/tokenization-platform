@@ -162,3 +162,6 @@ a:hover { text-decoration: underline; }
 
 /* ---------------------------------------------------------------- toast */
 .toast { position: fixed; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--neutral-900); color: #fff; padding: 10px 16px; border-radius: var(--r-control); z-index: 60; font-size: 13px; max-width: 90vw; }
+/* on the dark card the empty track must read as empty */
+.card-dark .progress { background: rgba(255, 255, 255, .16); border-color: transparent; }
+.card-dark .progress > span { background: #9fc0ff; }

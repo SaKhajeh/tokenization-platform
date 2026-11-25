@@ -4,6 +4,8 @@ _Version 1.1 · 2026-11-24 (v1.0 draft 2026-11-04) · Owner: Salman Khajeh · La
 
 _Changes in v1.1 (2026-11-24): aligned with the decisions made since v1.0. **D14** — the fund is the only issuer; companies are **applicants** (project companies) that request financing. **Doc 07** — the credit case and the fund's credit-limit method replace issuer onboarding, the A–D credit grade and the grade-based guarantee matrix; an application's credit step is the **limit check**. **D25–D27, D-C13, D-C21** — fees come from a versioned tariff (assessment fee at case submission, application fee after screening); two rates per series and the fund's spread; repayment waterfall; no arrangement fee. **D16** — project companies see only the amount raised. **D20, D6** — Jibit and RPC providers. **D23** — pre-assessed projects. Also FR-ORG-3 (invitation codes through an outbox) and §12.4 (idempotency recorded with the action). Requirements marked **(built)** exist in the code; see 01 §6 for the log. What follows the limit check (due diligence, committee, contracts) is not decided yet (D-C22) and is kept here as the v1.0 draft, marked as such._
 
+_Updated 2026-11-25: FR-AUTH-5 throttling per purpose; the screens of the credit path are built (apps/web, apps/admin; 01 §6 item 24)._
+
 ---
 
 ## 1. Overview
@@ -132,7 +134,7 @@ Requirement IDs: FR-<module>-<n>. Priority: P0 = must-have for the pilot, P1 = s
 - FR-AUTH-2 (P0) Login with OTP. Optional password + OTP. Sessions use short-lived access tokens and rotating refresh tokens.
 - FR-AUTH-3 (P0) Device binding: a new device needs OTP; list and revoke devices.
 - FR-AUTH-4 (P0) Step-up OTP for sensitive actions: approving money actions, changing bank accounts, changing members/roles, signing terms.
-- FR-AUTH-5 (P1) Rate limits and lockouts on OTP and login. Alert on login from a new device.
+- FR-AUTH-5 (P1) Rate limits and lockouts on OTP and login, per purpose: a repeat of the same request waits 60 s; login codes 5 per hour; confirmation (step-up) codes 30 per hour, separately, so confirming right after login or two actions in a row is never refused. Alert on login from a new device. (built, except the new-device alert)
 - FR-AUTH-6 (P0) A user profile holds name, national code, mobile and email. Shahkar verification (mobile ↔ national code) is required before the user can act for an org.
 
 ### M2 — Organisations, Members, Roles, Tasks

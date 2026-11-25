@@ -30,7 +30,7 @@ export default function NewApplication() {
   const over = !!rials && avail !== null && BigInt(rials) > avail;
   const ratePct = Number(latin(a.rate));
   const ok = [
-    ini.title.trim().length >= 3 && ini.description.trim().length >= 20 && ini.sector.trim().length >= 2 && ini.location.trim().length >= 2 && !!ini.started_on && ini.progress_summary.trim().length >= 10,
+    ini.title.trim().length >= 3 && ini.description.trim().length >= 20 && ini.sector.trim().length >= 2 && ini.location.trim().length >= 2 && !!ini.started_on && ini.progress_summary.trim().length >= 10 && evidence.length > 0,
     !!a.investment_type && !!rials && !over && Number(a.months) >= 1 && ratePct > 0 && ratePct < 100 && a.use_of_funds.trim().length >= 10,
     a.repayment_source.trim().length >= 10,
     guarantees.every((g) => g.type.trim().length >= 2 && g.description.trim().length >= 3),
@@ -68,6 +68,7 @@ export default function NewApplication() {
                 </div>
                 <TextArea label="پیشرفت تاکنون" value={ini.progress_summary} onValue={(v) => setIni({ ...ini, progress_summary: v })} />
                 <div className="row">{evidence.map((e) => <span key={e[0]} className="chip chip-info">{e[1]}</span>)}<FilePick size="sm" label="افزودن شاهد پیشرفت" category="evidence" onUploaded={(id, f) => setEvidence([...evidence, [id, f.name]])} /></div>
+                {!evidence.length && <span className="field-hint">دست‌کم یک مدرک لازم است: قرارداد، فاکتور خرید یا گزارش پیشرفت که نشان دهد طرح آغاز شده است.</span>}
               </>)}
               {step === 1 && (<>
                 <Select label="نوع تأمین مالی" value={a.investment_type} onValue={(v) => setA({ ...a, investment_type: v })} options={TYPES} />

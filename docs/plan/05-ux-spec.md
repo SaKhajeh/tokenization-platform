@@ -2,6 +2,8 @@
 
 _Date: 2026-11-04, updated 2026-11-24 · Companion to 02-prd-v1.md (FR IDs) and 04-integrations-jibit.md · Product language: Farsi (RTL), Jalali dates, Persian digits · Figma: https://www.figma.com/design/9pHyREdF55vvZKEEUHN1wE_
 
+_Updated 2026-11-25: the A-* screens of the credit path and the S-* screens for KYB, queues, credit cases and applications are built (routes: `apps/web/README.md`, `apps/admin/README.md`), from the tokens in §5; the confirmation pattern of §6 (summary → OTP sheet) is used for every step-up action._
+
 _Updated 2026-11-24: aligned with D14 (the fund is the only issuer; companies are applicants), doc 07 (credit case and credit limit instead of an issuer profile and a credit grade; screens A-05b, A-0H variant, A-69–A-74, S-16–S-19), D16 (project companies see only the amount raised), D25–D26 (fee tariff, two rates) and D-C21 (no arrangement fee). The case screens themselves are specified in doc 07 §11 and drawn per doc 06. Farsi terms marked “to confirm” are proposals, not yet on the canvas._
 
 ---

@@ -1,0 +1,33 @@
+import { WEB, browser, page, login, shot, nationalCode, legalId, stepUp, DIR } from "./lib.mjs";
+const R = String(Date.now()).slice(-4);
+const M = `0912${R}233`.slice(0, 11);
+import { writeFileSync } from "node:fs";
+writeFileSync(`${DIR}/run.json`, JSON.stringify({ M, R }));
+const b = await browser();
+const p = await page(b, { width: 390, height: 844 });
+await login(p, WEB, M);
+await p.waitForURL("**/onboarding");
+await shot(p, "01-onboarding");
+await p.getByLabel("کد ملی").fill(nationalCode(`00${R}456`.slice(0, 9)));
+await p.getByRole("button", { name: "تطبیق کد ملی" }).click();
+await p.getByLabel("نام ثبتی شرکت").fill("شرکت فناوران حسگر");
+await p.getByLabel("شناسه‌ی ملی (۱۱ رقم)").fill(legalId(`103${R}678`.slice(0, 10)));
+await p.getByRole("button", { name: "ثبت سازمان" }).click();
+await p.getByText("این سازمان در سامانه چه می‌کند؟").waitFor();
+await shot(p, "02-purpose");
+await p.getByRole("button", { name: "ادامه: احراز هویت سازمان" }).click();
+await p.waitForURL("**/kyb");
+await p.getByRole("button", { name: "دریافت اطلاعات ثبتی" }).click();
+await p.getByText("سوابق ثبتی (از سامانه‌ی ثبت)").waitFor();
+await p.getByLabel("تلفن ثابت").fill("02188776655");
+await shot(p, "03-kyb-form");
+// not listed in the (mock) registry → introduction letter
+await p.setInputFiles('input[type=file] >> nth=2', { name: "letter.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 test letter") }).catch(async () => {
+  const inputs = await p.locator("input[type=file]").count(); console.log("file inputs", inputs);
+});
+await p.getByText("بارگذاری شد: letter.pdf").waitFor({ timeout: 10000 });
+await stepUp(p, M, () => p.getByRole("button", { name: "ارسال برای بررسی" }).click());
+await p.getByText("در حال بررسی است").first().waitFor({ timeout: 10000 });
+await shot(p, "04-kyb-submitted");
+console.log("T1 OK");
+await b.close();

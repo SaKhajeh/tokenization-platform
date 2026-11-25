@@ -39,7 +39,7 @@ export default function ApplicationPage() {
               <Card title="جزئیات">
                 <KV rows={[
                   ["مبلغ", toman(a.requested_amount)], ["مدت", `${fa(Math.round(a.proposed_duration_days / 30.4))} ماه`],
-                  ["نرخ پیشنهادی", `${fa((Number(a.proposed_rate) * 100).toFixed(2).replace(/\.?0+$/, ""))}٪ ${a.proposed_rate_basis === "monthly" ? "ماهانه" : "سالانه"}`],
+                  ["نرخ پیشنهادی", `${fa((Number(a.proposed_rate) * 100).toFixed(2).replace(/\.?0+$/, "").replace(".", "٫"))}٪ ${a.proposed_rate_basis === "monthly" ? "ماهانه" : "سالانه"}`],
                   ["قاعده‌ی عدم تکمیل", a.proposed_rule === "all_or_nothing" ? "همه یا هیچ" : "تأمین به میزان جذب‌شده"],
                   ["محل مصرف", a.use_of_funds], ["منبع بازپرداخت", a.repayment_source],
                   ["تضامین", a.proposed_guarantees.map((g) => `${g.type}: ${g.description}`).join("؛ ")], ["تاریخ ارسال", jdate(a.submitted_at)],

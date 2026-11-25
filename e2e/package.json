@@ -1,0 +1,13 @@
+{
+  "name": "tp-e2e",
+  "private": true,
+  "description": "Browser walk-through of both apps against a local API (not part of the npm workspaces; see README)",
+  "type": "module",
+  "scripts": {
+    "test": "node t1.mjs && node t2.mjs && node t3.mjs && node t4.mjs && node t5.mjs"
+  },
+  "dependencies": {
+    "jalaali-js": "1.2.8",
+    "playwright": "1.65.0"
+  }
+}

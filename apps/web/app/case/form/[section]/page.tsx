@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { sectionProblems, type FormSection } from "@tp/domain/caseFile";
 import { jalaliToIso } from "@tp/domain/jalali";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
-import { Banner, Button, Card, Check, JalaliDateInput, Select, Status, TextArea, TextInput, Toast, latin } from "@tp/ui";
+import { Banner, Button, Card, Check, JalaliDateInput, Select, Status, TextArea, TextInput, Toast, fa, latin } from "@tp/ui";
 import { Shell } from "@/components/Shell";
 import { useMe } from "@/lib/me";
 import { EDITABLE, RETURNED_ITEM, type Case } from "@/lib/case";
@@ -62,6 +62,7 @@ export default function SectionPage() {
   const sec = cs.data?.sections.find((s) => s.section === section);
   const [data, setData] = useState<Record<string, any>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [ready, setReady] = useState(false); // fields stay disabled until the saved data is loaded, so typing is never overwritten
 
   useEffect(() => {
     if (!sec) return;
@@ -74,6 +75,7 @@ export default function SectionPage() {
       }
     }
     setData(base);
+    setReady(true);
   }, [sec?.section, sec?.state, cs.data?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const all = useMemo(() => Object.fromEntries((cs.data?.sections ?? []).map((s) => [s.section, s.section === section ? data : s.data])), [cs.data, data, section]);
@@ -82,7 +84,7 @@ export default function SectionPage() {
 
   if (!def) return <Shell title="بخش نامعتبر"><Link href="/case">بازگشت به پرونده</Link></Shell>;
   const c = cs.data;
-  const editable = !!c && EDITABLE.includes(c.state) && (org?.my_role === "org_admin" || org?.my_role === "preparer") && (c.state !== "returned" || (!!sec && RETURNED_ITEM.includes(sec.state)));
+  const editable = ready && !!c && EDITABLE.includes(c.state) && (org?.my_role === "org_admin" || org?.my_role === "preparer") && (c.state !== "returned" || (!!sec && RETURNED_ITEM.includes(sec.state)));
   const idx = SECTION_ORDER.indexOf(section);
   const next = SECTION_ORDER[idx + 1];
 
@@ -123,7 +125,7 @@ export default function SectionPage() {
                 {!rows.length && <p className="t-muted">موردی ثبت نشده است.</p>}
                 {rows.map((row, i) => (
                   <div key={row[r.autoId ?? "_"] ?? i} className="repeat-row">
-                    <div className="row-between"><strong>{r.label} {i + 1}</strong>
+                    <div className="row-between"><strong>{r.label} {fa(i + 1)}</strong>
                       {editable && <Button size="sm" variant="ghost" onClick={() => setData((d) => ({ ...d, [r.key]: rows.filter((_, j) => j !== i) }))}>حذف</Button>}
                     </div>
                     <div className="fieldset-grid">
