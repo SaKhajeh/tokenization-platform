@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>شبیه‌ساز سامانه‌ی تأمین مالی صندوق — همه‌ی کد ساخته‌شده تا ۱۴۰۵/۰۹/۰۷</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f1f5f9;--surface:#fff;--ink:#0f172a;--muted:#475569;--line:#cbd5e1;--brand:#0a2a66;--brand2:#0f3f99;--tint:#e6eefc;--ok:#166534;--okbg:#dcfce7;--warn:#92400e;--warnbg:#fef3c7;--bad:#991b1b;--badbg:#fee2e2;--tbrow:#fef3c7;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1220;--surface:#121b2e;--ink:#e5ecf7;--muted:#9fb0c8;--line:#26344d;--brand:#0a2a66;--brand2:#3b6fd8;--tint:#16264a;--ok:#86efac;--okbg:#0f2e1c;--warn:#fcd34d;--warnbg:#3a2a0b;--bad:#fca5a5;--badbg:#3b1414;--tbrow:#3a2a0b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1220;--surface:#121b2e;--ink:#e5ecf7;--muted:#9fb0c8;--line:#26344d;--brand:#0a2a66;--brand2:#3b6fd8;--tint:#16264a;--ok:#86efac;--okbg:#0f2e1c;--warn:#fcd34d;--warnbg:#3a2a0b;--bad:#fca5a5;--badbg:#3b1414;--tbrow:#3a2a0b;color-scheme:dark}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.75 Vazirmatn,Tahoma,sans-serif}
+header{background:var(--brand);color:#fff;padding:14px 20px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+header h1{font-size:17px;margin:0;font-weight:700}
+header .sub{font-size:12px;color:#c7d4f0}
+.datebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-inline-start:auto}
+.datebar input{width:110px;direction:ltr;text-align:center;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font:inherit;padding:4px 8px}
+.datebar button,.hbtn{border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer}
+.datebar .season{font-size:12px;background:rgba(255,255,255,.12);padding:3px 10px;border-radius:999px}
+.rolesbar{display:flex;gap:6px;flex-wrap:wrap;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--line);align-items:center}
+.role{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.role.on{background:var(--brand2);color:#fff;border-color:var(--brand2)}
+.role.next:not(.on){border-color:var(--warn);box-shadow:0 0 0 2px var(--warnbg)}
+.follow{margin-inline-start:auto;font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
+main{display:grid;grid-template-columns:250px minmax(0,1fr) 320px;gap:16px;padding:16px 20px;max-width:1500px;margin:0 auto}
+@media (max-width:1100px){main{grid-template-columns:minmax(0,1fr)}#railbox{order:3}#side{order:2}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+#rail{list-style:none;margin:0;padding:0;font-size:13px}
+#rail li{padding:5px 8px;border-radius:8px;color:var(--muted);display:flex;gap:6px}
+#rail li.ph{color:var(--ink);font-weight:700;margin-top:8px;padding-inline:0}
+#rail li.done{color:var(--ok)}#rail li.done::before{content:"✓";font-weight:700}
+#rail li.cur{background:var(--tint);color:var(--ink);font-weight:600}
+.stagehead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}
+.stagehead h2{margin:0;font-size:19px}
+.body>*+*{margin-top:10px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.btn{background:var(--brand2);color:#fff;border:0;border-radius:10px;min-height:40px;padding:0 16px;font:inherit;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--brand2);border:1px solid var(--line)}
+.btn.sec{background:var(--tint);color:var(--brand2);min-height:34px;font-size:13px}
+.btn.danger{background:#dc2626}
+.btn.sm2{min-height:30px;padding:0 10px;font-size:12px}
+.in{width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 10px;margin-top:4px}
+textarea.in{min-height:64px}
+.ltr{direction:ltr;text-align:left}
+.lb{display:block;font-size:13px;font-weight:500}
+.ck{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.ck input{margin-top:6px}
+.box{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.two,.grid3{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.note{background:var(--tint);border-radius:8px;padding:8px 12px;font-size:13px}
+.warn{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px}
+.okbox{background:var(--okbg);color:var(--ok);border-radius:8px;padding:8px 12px}
+.warn ul{margin:4px 0 0;padding-inline-start:18px}
+.muted{color:var(--muted)}.sm{font-size:12px}
+.chip{display:inline-block;border-radius:999px;padding:1px 10px;font-size:12px;background:var(--tint);color:var(--brand2);white-space:nowrap}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.bad{background:var(--badbg);color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row-b{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.calcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.calc{border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
+.calc.used{border-color:var(--brand2);background:var(--tint)}
+.big{font-size:24px;font-weight:700}
+.hero{background:var(--brand);color:#fff;border-radius:12px;padding:14px}.hero .muted{color:#c7d4f0}
+.t{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+.t th{color:var(--muted);font-weight:500;text-align:right;border-bottom:1px solid var(--line);padding:4px 6px}
+.t td{padding:4px 6px;border-bottom:1px solid var(--line)}.t td.n{direction:ltr;text-align:left}.t tr.tb td{background:var(--tbrow)}
+.t .in{margin:0;padding:3px 6px;direction:ltr;text-align:left;min-width:110px}
+.otp{background:var(--tint);border-radius:10px;padding:8px 12px}.otp .in{max-width:150px}
+.locked{text-align:center;padding:30px 10px}
+#side .card+.card{margin-top:12px}
+#side h3{margin:0 0 8px;font-size:14px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0;font-size:13px}dt{color:var(--muted)}dd{margin:0}
+#tools,#log{list-style:none;margin:0;padding:0;font-size:13px}
+#tools li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+#log{max-height:420px;overflow-y:auto}#log li{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+#toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:8px 16px;border-radius:10px;font-size:13px;z-index:9}
+footer{max-width:1500px;margin:0 auto;padding:0 20px 24px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>شبیه‌ساز سامانه‌ی تأمین مالی صندوق پژوهش و فناوری</h1><div class="sub">همه‌ی آنچه تا امروز در کد ساخته شده — با قواعد و موتور محاسبه‌ی حد واقعی</div></div>
+  <div class="datebar"><span class="sub">تاریخ شبیه‌سازی</span><input id="simdate" aria-label="تاریخ شبیه‌سازی (شمسی)">
+    <button data-date="2026-11-28">پاییز</button><button data-date="2027-02-15">زمستان</button><button data-date="2027-04-20">بهار</button><button data-date="2026-07-25">تابستان</button>
+    <span class="season" id="season"></span><button class="hbtn" id="reset">شروع دوباره</button></div>
+</header>
+<div class="rolesbar"><span class="muted sm">نقش شما:</span><span id="roles" class="row"></span>
+  <label class="follow"><input type="checkbox" id="follow"> نقش خودکار به نفر بعدی برود</label></div>
+<main>
+  <aside id="railbox" class="card"><h3 style="margin:0 0 6px;font-size:14px">مسیر</h3><ol id="rail"></ol></aside>
+  <section id="stage" class="card" aria-live="polite"></section>
+  <aside id="side">
+    <div class="card"><h3>وضعیت در سامانه</h3><dl id="state"></dl></div>
+    <div class="card"><h3>ابزارهای صندوق و کیف پول</h3><ul id="tools"></ul></div>
+    <div class="card"><h3>رویدادها</h3><ol id="log"></ol></div>
+  </aside>
+</main>
+<footer>شبیه‌سازی است: داده‌ها نمونه‌اند و چیزی ذخیره یا ارسال نمی‌شود. قواعد (نقش‌ها، ترتیب مراحل، قاعده‌ی فصل و بهار، چهار دوره و وزن‌های ۰٫۴/۰٫۳/۰٫۲/۰٫۱، الف و ب، تصمیم مدیر صندوق) مطابق کد شاخه‌ی main است و حد اعتباری با همان موتور سامانه محاسبه می‌شود.</footer>
+<div id="toast" hidden></div>
+<script>/*ENGINE*/</script>
+<script>/*APP*/</script>
+</body>
+</html>

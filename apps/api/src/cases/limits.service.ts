@@ -205,7 +205,7 @@ export class LimitsService {
   /** Reminder SMS the day before a confirmed visit. */
   async remindVisits() {
     const res = await withLease(this.db, "visits.remind", 300, async () => {
-      const tomorrow = isoFromUtcDate(new Date(Date.now() + 3.5 * 3600_000 + 86400_000));
+      const tomorrow = isoFromUtcDate(new Date(Date.parse(`${tehranToday()}T00:00:00Z`) + 86400_000)); // the shared clock (TP_TODAY in tests)
       const rows = (await this.db.query(
         `select v.*, c.org_id, c.case_no from case_visits v join cases c on c.id = v.case_id where v.state = 'confirmed' and v.visit_date = $1 and v.reminder_sent_at is null`,
         [tomorrow],
