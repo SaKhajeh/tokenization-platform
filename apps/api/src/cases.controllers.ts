@@ -196,7 +196,7 @@ export class CasesController {
       matrix: z.array(z.array(unit).length(5)).length(5),
       growthBands: bands, marginBands: bands, c1Bands: bands, c2Bands: bands,
       collateral: z.object({ cheque: z.number().positive().max(2), mortgage_2: z.number().positive().max(2), mortgage_1: z.number().positive().max(2) }),
-      marginWeights: z.tuple([unit, unit, unit]),
+      marginWeights: z.array(unit).min(3).max(4), // 3 periods (workbook, v1) or 4 (since v2)
       crl: z.object({ a: z.number(), b: z.number() }),
       taxRate: unit,
       limitCollateral: z.enum(["cheque", "mortgage_2", "mortgage_1"]),
@@ -246,6 +246,37 @@ export class CasesController {
   templateComplete(@Req() req: AppRequest, @Param("code") code: string, @Body() body: unknown) {
     const b = parse(z.object({ document_id: zUuid, sha256: z.string().regex(/^[0-9a-f]{64}$/) }), body);
     return this.tools.templateComplete(req, parse(z.string().regex(/^\d-\d$/), code), b.document_id, b.sha256);
+  }
+
+  /** Compliance officer: sends the credit-approved result to the CEO with a comment (fund rules 2026-11-26). */
+  @Post("admin/cases/:id/to-ceo")
+  @StaffOnly("compliance_officer")
+  @HttpCode(200)
+  toCeo(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.limits.toCeo(req, parse(zId, p).id, parse(z.object({ comment: zText(5, 3000) }), body).comment);
+  }
+
+  /** CEO: confirms the committee meeting was held, may edit the ceilings, accepts or declines with a comment. */
+  @Post("admin/cases/:id/ceo-decision")
+  @StaffOnly("ceo")
+  @StepUp()
+  @HttpCode(200)
+  ceoDecision(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    const rials = z.string().regex(/^\d{1,18}$/);
+    const set = z.object({ cheque: rials.optional(), mortgage_2: rials.optional(), mortgage_1: rials.optional() }).strict();
+    const b = parse(z.object({
+      meeting_held: z.literal(true), meeting_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), decision: z.enum(["accept", "decline"]), comment: zText(5, 3000),
+      overrides: z.object({ guarantee: set.optional(), facility: set.optional() }).nullable().optional(),
+    }), body);
+    return this.limits.ceoDecision(req, parse(zId, p).id, b);
+  }
+
+  /** Compliance officer: releases the result to the company with an explanation of the numbers; issues the limit. */
+  @Post("admin/cases/:id/release")
+  @StaffOnly("compliance_officer")
+  @HttpCode(200)
+  releaseResult(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.limits.release(req, parse(zId, p).id, parse(z.object({ note_to_applicant: zText(5, 3000) }), body).note_to_applicant);
   }
 
   /** مدیر اعتبارات divides cases between analysts. */
@@ -434,6 +465,7 @@ export class CasesController {
       activity_type: z.enum(ACTIVITY_TYPES), guarantee: zJ,
       reasons: z.object({ rc: zText(5, 2000), ra: zText(5, 2000), re: zText(5, 2000) }),
       facility: zJ.nullable().optional(),
+      trial_balance_check: z.object({ confirmed: z.boolean(), note: zText(5, 2000) }).nullable().optional(),
     }), body);
     return this.limits.score(req, parse(zId, p).id, b);
   }

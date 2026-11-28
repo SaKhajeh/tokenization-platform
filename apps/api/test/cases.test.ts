@@ -117,11 +117,14 @@ describe("credit case (plan/07)", () => {
     expect(r.body.problems).toEqual(["rule:not_balanced:1"]);
     expect((await t.http.put(`${V}/case/financials/${y0}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: { ...bad, cash: "1.5" } })).body.error.code).toBe("INVALID_FIGURES");
     expect((await t.http.put(`${V}/case/financials/${y0 - 4}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: year(1) })).body.error.code).toBe("FISCAL_YEAR_OUT_OF_RANGE");
-    // only the latest year may be a balance sheet alone
-    expect((await t.http.put(`${V}/case/financials/${y0 - 1}`).set(prep.auth).set(o).send({ statement_type: "balance_sheet", figures: year(205000) })).body.error.code).toBe("BALANCE_SHEET_LATEST_ONLY");
+    // the current-year period is the trial balance, the four years before it are statements
+    expect((await t.http.put(`${V}/case/financials/${y0}`).set(prep.auth).set(o).send({ statement_type: "trial_balance", figures: year(205000) })).body.error.code).toBe("TRIAL_BALANCE_PERIOD");
+    expect((await t.http.put(`${V}/case/financials/${y0 + 1}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: year(205000) })).body.error.code).toBe("TRIAL_BALANCE_PERIOD");
     for (const [i, s] of [[0, 310000], [1, 205000], [2, 138000], [3, 90000]] as const) {
       await t.http.put(`${V}/case/financials/${y0 - i}`).set(prep.auth).set(o).send({ statement_type: i === 0 ? "audited" : "tax_return", figures: year(s) }).expect(200);
     }
+    // the current-year trial balance (to the end of the last completed season): its own period, fiscal year latest + 1
+    await t.http.put(`${V}/case/financials/${y0 + 1}`).set(prep.auth).set(o).send({ statement_type: "trial_balance", figures: year(160000) }).expect(200);
 
     // letter: free text, signed by an approver/admin with step-up
     await t.http.put(`${V}/case/letter`).set(prep.auth).set(o).send({ text: "درخواست تأمین مالی حدود ۲۰ میلیارد ریال برای خرید تجهیزات خط تولید حسگر." }).expect(200);

@@ -12,7 +12,7 @@
  *                 ceilings for the report. The norm usage ledger draws it down (amount ÷ (Ra × Re)).
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { ActivityType, addJalaliMonths, DEFAULT_SCORING_METHOD, invoiceTotals, jalaliYearOf, LIMIT_VALIDITY_MONTHS, ROUND, RoundState, scoreCase, ScoringMethod, ScoringInputError, toFinancialYear, toRials, transition, usageLedger, validateScoringMethod, VISIT, VisitState, checklistItem, COLLATERAL_CLASSES, isoFromUtcDate, scoringYears } from "@tp/domain";
+import { ActivityType, addJalaliMonths, DEFAULT_SCORING_METHOD, invoiceTotals, jalaliYearOf, LIMIT_VALIDITY_MONTHS, ROUND, RoundState, scoreCase, ScoringMethod, ScoringInputError, toFinancialYear, toRials, transition, usageLedger, validateScoringMethod, VISIT, VisitState, checklistItem, COLLATERAL_CLASSES, isoFromUtcDate, scoringYears, SCORING_METHOD_V2_CHANGES, calculationPeriods } from "@tp/domain";
 import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -227,9 +227,13 @@ export class LimitsService {
 
   async method(q: Queryable = this.db): Promise<ScoringMethod> {
     const r = (await q.query(`select * from scoring_methods order by version desc limit 1`)).rows[0];
-    if (r) return { ...r.config, version: r.version };
-    await q.query(`insert into scoring_methods (version, config, note) values (1, $1, 'built-in default: the fund''s workbook') on conflict do nothing`, [JSON.stringify(DEFAULT_SCORING_METHOD)]);
-    return DEFAULT_SCORING_METHOD;
+    // Built-in versions: 1 = the fund's workbook (3 periods); 2 = the fund's 2026-11-26 rules (4 periods, weights
+    // 0.4/0.3/0.2/0.1). Version 2 is added once, unless the fund has already published its own later versions.
+    if (r && (r.version >= 2 || r.created_by)) return { ...r.config, version: r.version };
+    const v2: ScoringMethod = { ...DEFAULT_SCORING_METHOD, ...SCORING_METHOD_V2_CHANGES, version: 2 };
+    await q.query(`insert into scoring_methods (version, config, note) values (1, $1, 'built-in: the fund''s workbook') on conflict do nothing`, [JSON.stringify(DEFAULT_SCORING_METHOD)]);
+    await q.query(`insert into scoring_methods (version, config, note) values (2, $1, 'built-in: four periods, margin weights 0.4/0.3/0.2/0.1 (fund, 2026-11-26)') on conflict do nothing`, [JSON.stringify(v2)]);
+    return v2;
   }
 
   async setMethod(req: AppRequest, input: Omit<ScoringMethod, "version"> & { note?: string }) {
@@ -256,16 +260,42 @@ export class LimitsService {
     return missing;
   }
 
+  /**
+   * Two calculations (fund rules 2026-11-26, doc 07 §13.2): A on the latest years of statements, B on the current-year
+   * trial balance plus the statements before it (the trial balance is not annualised). A is used unless B is higher
+   * AND the analyst has checked the trial balance against the tax returns and other documents. The chosen result is
+   * returned in the usual shape, with both calculations and the choice attached (stored as the round's outputs).
+   */
   compute(c: any, fin: any[], method: ScoringMethod, input: ScoreInput) {
-    // the three latest full years (a balance-sheet-only latest year is skipped), as the fund's method needs
-    const latestType = fin.find((r) => r.fiscal_year === c.latest_fiscal_year)?.statement_type;
-    const years = scoringYears(c.latest_fiscal_year, latestType).map((y) => toFinancialYear(fin.find((r) => r.fiscal_year === y)?.verified ?? {}));
+    const n = method.marginWeights.length;
+    const periods = calculationPeriods(c.latest_fiscal_year, n);
+    const row = (y: number) => fin.find((r) => r.fiscal_year === y);
+    const run = (ys: number[]) => scoreCase({ activityType: input.activity_type, years: ys.map((y) => toFinancialYear(row(y)?.verified ?? {})), guarantee: input.guarantee, facility: input.facility ?? undefined }, method);
+    let a: any;
     try {
-      return scoreCase({ activityType: input.activity_type, years: years as any, guarantee: input.guarantee, facility: input.facility ?? undefined }, method);
+      a = run(periods.a);
     } catch (e) {
       if (e instanceof ScoringInputError) throw err.scoring(e.problems);
       throw e;
     }
+    let b: any = null, bError: string[] | null = null;
+    try {
+      if (!row(c.latest_fiscal_year + 1)?.verified) throw new ScoringInputError(["trial balance missing"]);
+      b = run(periods.b);
+    } catch (e) {
+      if (e instanceof ScoringInputError) bError = e.problems; else throw e;
+    }
+    const bHigher = !!b && b.creditLimit > a.creditLimit;
+    const useB = bHigher && !!input.trial_balance_check?.confirmed;
+    const chosen = useB ? b : a;
+    const label = (ys: number[]) => ys.map((y) => ({ fiscal_year: y, trial_balance: y === c.latest_fiscal_year + 1, through_month: row(y)?.through_month ?? null }));
+    return {
+      ...chosen,
+      chosen: useB ? "b" : "a",
+      b_higher: bHigher,
+      trial_balance_check: input.trial_balance_check ?? null,
+      alternatives: { a: { ...a, periods: label(periods.a) }, b: b ? { ...b, periods: label(periods.b) } : null, b_error: bError },
+    };
   }
 
   /** The analyst runs (or re-runs) the current round. Moves documents_complete / sent_back_to_analyst → scoring. */
@@ -278,7 +308,7 @@ export class LimitsService {
         if (missing.length) throw err.notReady(missing);
       }
       const method = await this.method(q);
-      const fin = (await q.query(`select fiscal_year, verified, statement_type from case_financials where case_id = $1`, [caseId])).rows;
+      const fin = (await q.query(`select fiscal_year, verified, statement_type, through_month from case_financials where case_id = $1`, [caseId])).rows;
       const result = this.compute(c, fin, method, input);
       let round = (await q.query(`select * from assessment_rounds where case_id = $1 and state in ('preparing','sent_back') order by round_no desc limit 1 for update`, [caseId])).rows[0];
       const judgement = { ...input.guarantee, reasons: input.reasons };
@@ -318,37 +348,25 @@ export class LimitsService {
     });
   }
 
+  /**
+   * The credit approval (credit manager or fund manager, never the preparer): approve → the round goes to the
+   * compliance officer, who sends it to the CEO; send back → the analyst; decline → the case is declined.
+   * The limit itself is issued only when the compliance officer releases the CEO's accepted result (fund rules 2026-11-26).
+   */
   async decide(req: AppRequest, caseId: string, input: { decision: "approve" | "send_back" | "decline"; reason?: string; note_to_applicant?: string }) {
     return this.db.tx(async (q) => {
       const c = await this.cases.caseById(q, caseId, true);
       if (c.state !== "pending_approval") throw err.state("Deciding the limit", c.state);
       const round = (await q.query(`select * from assessment_rounds where case_id = $1 and state = 'pending_approval' for update`, [caseId])).rows[0];
+      if (!round) throw err.state("Deciding the limit", "no round pending approval");
       if (round.prepared_by === req.user!.id) throw err.self();
-      const to: RoundState = input.decision === "approve" ? "approved" : input.decision === "send_back" ? "sent_back" : "declined";
+      const to: RoundState = input.decision === "approve" ? "credit_approved" : input.decision === "send_back" ? "sent_back" : "declined";
       transition("round", ROUND, round.state as RoundState, to);
       await q.query(`update assessment_rounds set state = $2, decided_by = $3, decided_at = now(), decision_reason = $4, note_to_applicant = $5 where id = $1`,
         [round.id, to, req.user!.id, input.reason ?? null, input.note_to_applicant ?? null]);
       await closeWorkflowTasks(q, "case", caseId, req.user!.id);
-      let limit: any = null;
-      if (to === "approved") {
-        const r = round.outputs;
-        const ceilings: Record<string, Record<string, string>> = { guarantee: {}, facility: {} };
-        for (const k of COLLATERAL_CLASSES) {
-          ceilings.guarantee[k] = toRials(r.guarantee.ceiling[k]).toString();
-          ceilings.facility[k] = toRials(r.facility.ceiling[k]).toString();
-        }
-        const today = tehranToday();
-        await q.query(`update credit_limits set status = 'superseded' where org_id = $1 and status = 'active'`, [c.org_id]);
-        limit = {
-          id: uuidv7(), limit_rials: toRials(r.creditLimit), norm: toRials(r.normCeiling), valid_from: today, valid_to: addJalaliMonths(today, LIMIT_VALIDITY_MONTHS),
-        };
-        await q.query(
-          `insert into credit_limits (id, org_id, case_id, round_id, limit_rials, norm_ceiling_rials, ra, re, ceilings, valid_from, valid_to) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-          [limit.id, c.org_id, caseId, round.id, limit.limit_rials.toString(), limit.norm.toString(), round.judgement.ra, round.judgement.re, JSON.stringify(ceilings), limit.valid_from, limit.valid_to],
-        );
-        await this.cases.move(q, c, "limit_issued", req.user!.id);
-        await q.query(`update orgs set is_applicant = true, updated_at = now() where id = $1`, [c.org_id]);
-        await this.notifications.notify(q, { to: { orgId: c.org_id }, event: "case.limit_issued", params: { no: c.case_no } });
+      if (to === "credit_approved") {
+        await staffTask(q, { title: `ارسال نتیجه‌ی اعتبارسنجی پرونده ${c.case_no} به مدیرعامل`, description: input.reason, linkedType: "case", linkedId: caseId, role: "compliance_officer", key: "case.to_ceo", dueInHours: 48 });
       } else if (to === "sent_back") {
         await this.cases.move(q, c, "sent_back_to_analyst", req.user!.id, input.reason);
         await staffTask(q, { title: `بازنگری محاسبه‌ی حد اعتباری پرونده ${c.case_no}`, description: input.reason, linkedType: "case", linkedId: caseId, role: "analyst", key: "case.rescore", dueInHours: 48 });
@@ -356,9 +374,100 @@ export class LimitsService {
         await this.cases.move(q, c, "declined", req.user!.id, input.reason);
         await this.notifications.notify(q, { to: { orgId: c.org_id }, event: "case.declined", params: { no: c.case_no, note: input.note_to_applicant ?? "" } });
       }
-      await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: `case.limit_${to}`, entityType: "assessment_round", entityId: round.id, after: { reason: input.reason, limit_rials: limit?.limit_rials?.toString() } });
-      return { case_state: c.state, round_state: to, credit_limit: limit && { id: limit.id, limit_rials: limit.limit_rials.toString(), valid_to: limit.valid_to } };
+      await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: `case.limit_${to}`, entityType: "assessment_round", entityId: round.id, after: { reason: input.reason } });
+      return { case_state: (await this.cases.caseById(q, caseId)).state, round_state: to };
     });
+  }
+
+  /** Compliance officer: sends the credit-approved result to the CEO with a comment. */
+  async toCeo(req: AppRequest, caseId: string, comment: string) {
+    return this.db.tx(async (q) => {
+      const c = await this.cases.caseById(q, caseId, true);
+      const round = await this.roundIn(q, caseId, "credit_approved");
+      transition("round", ROUND, "credit_approved", "ceo_review");
+      await q.query(`update assessment_rounds set state = 'ceo_review', compliance_comment = $2, compliance_by = $3, compliance_at = now() where id = $1`, [round.id, comment, req.user!.id]);
+      await closeWorkflowTasks(q, "case", caseId, req.user!.id);
+      await staffTask(q, { title: `تصمیم درباره‌ی حد اعتباری پرونده ${c.case_no}`, description: comment, linkedType: "case", linkedId: caseId, role: "ceo", key: "case.ceo_decision", dueInHours: 72 });
+      await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: "case.limit_to_ceo", entityType: "assessment_round", entityId: round.id, after: { comment } });
+      return { round_state: "ceo_review" };
+    });
+  }
+
+  /**
+   * CEO: confirms the committee meeting on the limit was held, may edit the numbers (guarantee and facility ceilings
+   * per collateral), accepts or declines, and comments. Goes back to the compliance officer.
+   */
+  async ceoDecision(req: AppRequest, caseId: string, input: { meeting_held: true; meeting_date: string; decision: "accept" | "decline"; comment: string;
+    overrides?: { guarantee?: Partial<Record<string, string>>; facility?: Partial<Record<string, string>> } | null }) {
+    return this.db.tx(async (q) => {
+      const c = await this.cases.caseById(q, caseId, true);
+      const round = await this.roundIn(q, caseId, "ceo_review");
+      if (round.prepared_by === req.user!.id) throw err.self();
+      const to: RoundState = input.decision === "accept" ? "ceo_accepted" : "ceo_declined";
+      transition("round", ROUND, "ceo_review", to);
+      const overrides = input.decision === "accept" && input.overrides && (Object.keys(input.overrides.guarantee ?? {}).length || Object.keys(input.overrides.facility ?? {}).length) ? input.overrides : null;
+      await q.query(
+        `update assessment_rounds set state = $2, committee_meeting_on = $3, ceo_decision = $4, ceo_comment = $5, ceo_overrides = $6, ceo_by = $7, ceo_at = now() where id = $1`,
+        [round.id, to, input.meeting_date, input.decision, input.comment, overrides ? JSON.stringify(overrides) : null, req.user!.id],
+      );
+      await closeWorkflowTasks(q, "case", caseId, req.user!.id);
+      await staffTask(q, { title: `اعلام نتیجه‌ی اعتبارسنجی پرونده ${c.case_no} به شرکت`, description: input.comment, linkedType: "case", linkedId: caseId, role: "compliance_officer", key: "case.release", dueInHours: 48 });
+      await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: `case.limit_${to}`, entityType: "assessment_round", entityId: round.id, after: { meeting_date: input.meeting_date, comment: input.comment, overrides } });
+      return { round_state: to };
+    });
+  }
+
+  /** Compliance officer: releases the CEO's decision to the company with an explanation of the numbers; issues the limit. */
+  async release(req: AppRequest, caseId: string, note: string) {
+    return this.db.tx(async (q) => {
+      const c = await this.cases.caseById(q, caseId, true);
+      const round = (await q.query(`select * from assessment_rounds where case_id = $1 and state in ('ceo_accepted','ceo_declined') for update`, [caseId])).rows[0];
+      if (!round) throw err.state("Releasing the result", "no CEO decision");
+      const to: RoundState = round.state === "ceo_accepted" ? "approved" : "declined";
+      transition("round", ROUND, round.state as RoundState, to);
+      await q.query(`update assessment_rounds set state = $2, note_to_applicant = $3, released_by = $4, released_at = now() where id = $1`, [round.id, to, note, req.user!.id]);
+      await closeWorkflowTasks(q, "case", caseId, req.user!.id);
+      let limit: any = null;
+      if (to === "approved") {
+        limit = await this.issueLimit(q, c, round);
+        await this.cases.move(q, c, "limit_issued", req.user!.id);
+        await q.query(`update orgs set is_applicant = true, updated_at = now() where id = $1`, [c.org_id]);
+        await this.notifications.notify(q, { to: { orgId: c.org_id }, event: "case.limit_issued", params: { no: c.case_no } });
+      } else {
+        await this.cases.move(q, c, "declined", req.user!.id, round.ceo_comment);
+        await this.notifications.notify(q, { to: { orgId: c.org_id }, event: "case.declined", params: { no: c.case_no, note } });
+      }
+      await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: `case.limit_released_${to}`, entityType: "assessment_round", entityId: round.id, after: { note, limit_rials: limit?.limit_rials } });
+      return { round_state: to, credit_limit: limit };
+    });
+  }
+
+  private async roundIn(q: Queryable, caseId: string, state: RoundState) {
+    const r = (await q.query(`select * from assessment_rounds where case_id = $1 and state = $2 for update`, [caseId, state])).rows[0];
+    if (!r) throw err.state("This step", `no round in ${state}`);
+    return r;
+  }
+
+  /** Issues the limit from the round's result and the CEO's edits (the norm scales with an edited limit, so usage stays consistent). */
+  private async issueLimit(q: Queryable, c: any, round: any) {
+    const r = round.outputs;
+    const ceilings: Record<string, Record<string, string>> = { guarantee: {}, facility: {} };
+    for (const k of COLLATERAL_CLASSES) {
+      ceilings.guarantee[k] = round.ceo_overrides?.guarantee?.[k] ?? toRials(r.guarantee.ceiling[k]).toString();
+      ceilings.facility[k] = round.ceo_overrides?.facility?.[k] ?? toRials(r.facility.ceiling[k]).toString();
+    }
+    const computed = toRials(r.creditLimit);
+    const limitRials = BigInt(ceilings.guarantee.cheque);
+    const norm = computed > 0n ? (toRials(r.normCeiling) * limitRials) / computed : toRials(r.normCeiling);
+    const today = tehranToday();
+    await q.query(`update credit_limits set status = 'superseded' where org_id = $1 and status = 'active'`, [c.org_id]);
+    const id = uuidv7();
+    const validTo = addJalaliMonths(today, LIMIT_VALIDITY_MONTHS);
+    await q.query(
+      `insert into credit_limits (id, org_id, case_id, round_id, limit_rials, norm_ceiling_rials, ra, re, ceilings, valid_from, valid_to) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [id, c.org_id, c.id, round.id, limitRials.toString(), norm.toString(), round.judgement.ra, round.judgement.re, JSON.stringify(ceilings), today, validTo],
+    );
+    return { id, limit_rials: limitRials.toString(), valid_to: validTo, edited_by_ceo: !!round.ceo_overrides };
   }
 
   async rounds(caseId: string) {
@@ -367,6 +476,8 @@ export class LimitsService {
       id: x.id, round_no: x.round_no, state: x.state, method_version: x.method_version, activity_type: x.activity_type, judgement: x.judgement, facility: x.facility,
       result: summarise(x.outputs), summary: x.summary, prepared_by: x.prepared_by, prepared_at: x.prepared_at, decided_by: x.decided_by, decided_at: x.decided_at,
       decision_reason: x.decision_reason, note_to_applicant: x.note_to_applicant,
+      compliance_comment: x.compliance_comment, compliance_at: x.compliance_at, committee_meeting_on: x.committee_meeting_on ? isoFromUtcDate(x.committee_meeting_on) : null,
+      ceo_decision: x.ceo_decision, ceo_comment: x.ceo_comment, ceo_overrides: x.ceo_overrides, ceo_at: x.ceo_at, released_at: x.released_at,
     }));
   }
 
@@ -514,6 +625,8 @@ export interface ScoreInput {
   guarantee: { rc: number; ra: number; re: number };
   reasons: { rc: string; ra: string; re: string };
   facility?: { rc: number; ra: number; re: number } | null;
+  /** Needed to use calculation B when it is higher: the trial balance was checked against the tax returns and other documents. */
+  trial_balance_check?: { confirmed: boolean; note: string } | null;
 }
 
 function tariffView(t: any) {
@@ -527,7 +640,27 @@ function tariffView(t: any) {
 const publicUsage = (u: any) => ({ id: u.id, source_type: u.source_type, source_id: u.source_id, description: u.description, amount: String(u.amount_rials), ra: Number(u.ra), re: Number(u.re), active: u.active, released_at: u.released_at });
 
 /** The scoring result for the fund panel (S-18, S-19), amounts converted to rials. */
-function summarise(r: any) {
+function summarise(r: any): any {
+  const rials = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, toRials(v).toString()]));
+  // per period, for the committee: each period separately, the trial balance marked (it is not annualised)
+  const periods = (x: any) => (x.periods ?? []).map((p: any, i: number) => ({
+    ...p, sales: toRials(x.statements[i].sales).toString(), profit_before_tax: toRials(x.statements[i].profitBeforeTax).toString(), margin: x.ratios[i].profitability,
+    growth: i < x.statements.length - 1 ? (x.statements[i].sales - x.statements[i + 1].sales) / x.statements[i + 1].sales : null,
+  }));
+  return {
+    ...(r.alternatives ? {
+      chosen: r.chosen, b_higher: r.b_higher, trial_balance_check: r.trial_balance_check,
+      alternatives: {
+        a: { ...summariseOne(r.alternatives.a), periods: periods(r.alternatives.a) },
+        b: r.alternatives.b ? { ...summariseOne(r.alternatives.b), periods: periods(r.alternatives.b) } : null,
+        b_error: r.alternatives.b_error,
+      },
+    } : {}),
+    ...summariseOne(r),
+  };
+}
+
+function summariseOne(r: any) {
   const rials = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, toRials(v).toString()]));
   return {
     credit_limit: toRials(r.creditLimit).toString(), norm_ceiling: toRials(r.normCeiling).toString(),

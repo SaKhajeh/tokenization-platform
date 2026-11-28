@@ -356,12 +356,21 @@ export function casePeople(board: Data | undefined): CasePerson[] {
  * They are reported figures, not money held by the platform; the scoring model converts them to numbers.
  */
 export type FinancialFigures = Record<(typeof FINANCIAL_FIELDS)[number], string>;
-export const STATEMENT_TYPES = ["audited", "tax_return", "internal", "balance_sheet"] as const;
+export const STATEMENT_TYPES = ["audited", "tax_return", "internal", "balance_sheet", "trial_balance"] as const;
 
 /** Years of figures and statements asked for (fund feedback 2026-11-25: four; was three). */
 export const FINANCIAL_YEARS = 4;
 /** Fiscal years asked for, latest first. */
 export const financialYears = (latest: number) => Array.from({ length: FINANCIAL_YEARS }, (_, i) => latest - i);
+/** Periods entered: the current-year trial balance (fiscal year latest + 1), then the four years of statements. */
+export const financialPeriods = (latest: number) => [latest + 1, ...financialYears(latest)];
+
+/**
+ * The two calculations (fund rules 2026-11-26): A on the statements of the latest `n` years; B on the current-year
+ * trial balance plus the statements of the latest `n - 1` years. `n` is the method's number of periods (4 since v2).
+ */
+export const calculationPeriods = (latest: number, n: number) => ({ a: financialYears(latest).slice(0, n), b: [latest + 1, ...financialYears(latest).slice(0, n - 1)] });
+
 /**
  * The three years the scoring method uses (the fund's workbook needs three full years): the latest three, unless the
  * latest year is only a balance sheet (allowed for the latest year), then the three before it.
@@ -407,11 +416,21 @@ export const VISIT: Machine<VisitState> = {
 };
 
 /** One scoring round: the analyst prepares, the fund manager (never the preparer) approves, sends back or declines. */
-export type RoundState = "preparing" | "pending_approval" | "sent_back" | "approved" | "declined";
+/**
+ * A scoring round (fund rules 2026-11-26): the analyst prepares it; the credit manager (or fund manager) approves it,
+ * sends it back or declines it; after the credit approval the compliance officer sends the result to the CEO with a
+ * comment; the CEO confirms the committee meeting was held and accepts (possibly editing the numbers) or declines;
+ * the compliance officer then releases the result to the company with an explanation — only then is a limit issued.
+ */
+export type RoundState = "preparing" | "pending_approval" | "sent_back" | "credit_approved" | "ceo_review" | "ceo_accepted" | "ceo_declined" | "approved" | "declined";
 export const ROUND: Machine<RoundState> = {
   preparing: ["pending_approval"],
-  pending_approval: ["approved", "sent_back", "declined"],
+  pending_approval: ["credit_approved", "sent_back", "declined"],
   sent_back: ["pending_approval"],
+  credit_approved: ["ceo_review"],
+  ceo_review: ["ceo_accepted", "ceo_declined"],
+  ceo_accepted: ["approved"],
+  ceo_declined: ["declined"],
   approved: [],
   declined: [],
 };

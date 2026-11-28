@@ -6,10 +6,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { makeApp, TestApp, staff, approvedOrg, uploadDoc, idem, Session } from "./helpers.js";
-import { prepareCase, submitCase, acceptAll, su, year, BOARD_NC } from "./case-flow.js";
+import { prepareCase, submitCase, acceptAll, su, year, BOARD_NC, finishChain } from "./case-flow.js";
 
 let t: TestApp;
-let co: Session, an: Session, an2: Session, cm: Session, fm: Session, tech: Session;
+let co: Session, an: Session, an2: Session, cm: Session, fm: Session, tech: Session, ceo: Session;
 beforeAll(async () => {
   t = await makeApp();
   co = await staff(t, "09357770001", "compliance_officer");
@@ -18,18 +18,17 @@ beforeAll(async () => {
   cm = await staff(t, "09357770004", "credit_manager");
   fm = await staff(t, "09357770005", "fund_manager");
   tech = await staff(t, "09357770006", "technical_expert");
+  ceo = await staff(t, "09357770007", "ceo");
 });
 afterAll(async () => t.close());
 const V = "/api/v1";
 const tomorrow = () => new Date(Date.now() + 3.5 * 3600_000 + 86400_000).toISOString().slice(0, 10);
 
 /** A prepared, submitted, reviewed case with the visit done and originals received, ready to score. */
-async function readyToScore(n: number, latestType: "audited" | "balance_sheet") {
+async function readyToScore(n: number, tbSales?: number) {
   const a = await approvedOrg(t, n, { compliance: co, financing: true, extraPeople: [{ nationalCode: BOARD_NC, name: "رضا کریمی", roles: ["board"] }] });
   const { caseId, y0 } = await prepareCase(t, a);
-  if (latestType === "balance_sheet") {
-    await t.http.put(`${V}/case/financials/${y0}`).set(a.admin.auth).set(a.org).send({ statement_type: "balance_sheet", figures: year(310000) }).expect(200);
-  }
+  if (tbSales) await t.http.put(`${V}/case/financials/${y0 + 1}`).set(a.admin.auth).set(a.org).send({ statement_type: "trial_balance", figures: year(tbSales) }).expect(200);
   await submitCase(t, a);
   await acceptAll(t, an, caseId);
   await t.http.post(`${V}/admin/cases/${caseId}/financials/lock`).set(an.auth).expect(200);
@@ -55,18 +54,56 @@ describe("fund feedback 2026-11-25", () => {
     expect(note.body).not.toMatch(/\d{4}-\d{2}-\d{2}/); // the date is Jalali
   });
 
-  it("with a balance-sheet-only latest year, scoring uses the three years before it", async () => {
-    const full = await readyToScore(402, "audited");
-    const bs = await readyToScore(403, "balance_sheet");
-    const g1 = (await t.http.post(`${V}/admin/cases/${full.caseId}/scoring`).set(an.auth).send(scoreBody).expect(200)).body.result.avg_growth;
-    const g2 = (await t.http.post(`${V}/admin/cases/${bs.caseId}/scoring`).set(an.auth).send(scoreBody).expect(200)).body.result.avg_growth;
-    // sales: Y0 310,000 · Y1 205,000 · Y2 138,000 · Y3 90,000
-    expect(g1).toBeCloseTo(((310000 - 205000) / 205000 + (205000 - 138000) / 138000) / 2, 6);
-    expect(g2).toBeCloseTo(((205000 - 138000) / 138000 + (138000 - 90000) / 90000) / 2, 6);
+  it("calculates twice: A on four years of statements, B on the trial balance plus three years; B needs the analyst's check", async () => {
+    // sales: trial balance 600,000 (high on purpose) · Y0 310,000 · Y1 205,000 · Y2 138,000 · Y3 90,000
+    const { caseId } = await readyToScore(402, 600000);
+    const r1 = (await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(an.auth).send(scoreBody).expect(200)).body.result;
+    expect(r1.alternatives.a.periods.map((p: any) => p.trial_balance)).toEqual([false, false, false, false]);
+    expect(r1.alternatives.b.periods.map((p: any) => p.trial_balance)).toEqual([true, false, false, false]);
+    expect(r1.alternatives.b.periods[0].through_month).toBeGreaterThan(0); // the committee sees how many months it covers
+    expect(r1.alternatives.a.avg_growth).toBeCloseTo(((310000 - 205000) / 205000 + (205000 - 138000) / 138000 + (138000 - 90000) / 90000) / 3, 6);
+    expect(r1.b_higher).toBe(true);
+    expect(r1.chosen).toBe("a"); // B is higher but not yet checked → A stands
+    expect(r1.credit_limit).toBe(r1.alternatives.a.credit_limit);
+    const r2 = (await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(an.auth)
+      .send({ ...scoreBody, trial_balance_check: { confirmed: true, note: "تراز با اظهارنامه و گردش حساب تطبیق داده شد." } }).expect(200)).body.result;
+    expect(r2.chosen).toBe("b");
+    expect(r2.credit_limit).toBe(r2.alternatives.b.credit_limit);
+    expect(BigInt(r2.credit_limit) > BigInt(r1.credit_limit)).toBe(true);
+  });
+
+  it("the CEO confirms the committee meeting, may edit the ceilings or decline; only then is anything sent to the company", async () => {
+    const { a, caseId } = await readyToScore(407);
+    await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(an.auth).send(scoreBody).expect(200);
+    await t.http.post(`${V}/admin/cases/${caseId}/scoring/submit`).set(an.auth).send({ summary: "پیشنهاد حد با چک و سفته." }).expect(200);
+    const ok = { decision: "approve" };
+    await t.http.post(`${V}/admin/cases/${caseId}/decision`).set(cm.auth).set(await su(t, cm, "POST", `/admin/cases/${caseId}/decision`, ok, {})).send(ok).expect(200);
+    expect((await t.http.get(`${V}/case/limit`).set(a.admin.auth).set(a.org).expect(200)).body.limit).toBeNull(); // nothing for the company yet
+    // only the compliance officer sends to the CEO; only the CEO decides; the meeting must be confirmed
+    expect((await t.http.post(`${V}/admin/cases/${caseId}/to-ceo`).set(an.auth).send({ comment: "برای تصمیم" })).status).toBe(403);
+    await t.http.post(`${V}/admin/cases/${caseId}/to-ceo`).set(co.auth).send({ comment: "کمیته‌ی اعتباری حد را تأیید کرد." }).expect(200);
+    const noMeeting = { meeting_held: false, meeting_date: "2026-11-20", decision: "accept", comment: "تأیید" };
+    expect((await t.http.post(`${V}/admin/cases/${caseId}/ceo-decision`).set(ceo.auth).set(await su(t, ceo, "POST", `/admin/cases/${caseId}/ceo-decision`, noMeeting, {})).send(noMeeting)).status).toBe(400);
+    const edit = { meeting_held: true, meeting_date: "2026-11-20", decision: "accept", comment: "با حد کمتر تأیید می‌شود.", overrides: { guarantee: { cheque: "150000000000" }, facility: { cheque: "40000000000" } } };
+    await t.http.post(`${V}/admin/cases/${caseId}/ceo-decision`).set(ceo.auth).set(await su(t, ceo, "POST", `/admin/cases/${caseId}/ceo-decision`, edit, {})).send(edit).expect(200);
+    const rel = (await t.http.post(`${V}/admin/cases/${caseId}/release`).set(co.auth).send({ note_to_applicant: "حد با نظر مدیرعامل ۱۵ میلیارد تومان تعیین شد." }).expect(200)).body;
+    expect(rel.credit_limit).toMatchObject({ limit_rials: "150000000000", edited_by_ceo: true });
+    const mine = (await t.http.get(`${V}/case/limit`).set(a.admin.auth).set(a.org).expect(200)).body;
+    expect(mine.limit).toMatchObject({ limit: "150000000000", available: "150000000000" });
+    expect(mine.limit.ceilings.facility.cheque).toBe("40000000000");
+    expect(mine.note).toContain("مدیرعامل");
+
+    // a declined result reaches the company as a decline, with the compliance officer's explanation
+    const d = await readyToScore(408);
+    await t.http.post(`${V}/admin/cases/${d.caseId}/scoring`).set(an.auth).send(scoreBody).expect(200);
+    await t.http.post(`${V}/admin/cases/${d.caseId}/scoring/submit`).set(an.auth).send({ summary: "پیشنهاد حد." }).expect(200);
+    await t.http.post(`${V}/admin/cases/${d.caseId}/decision`).set(cm.auth).set(await su(t, cm, "POST", `/admin/cases/${d.caseId}/decision`, ok, {})).send(ok).expect(200);
+    await finishChain(t, d.caseId, co, ceo, { decision: "decline", note: "در این مرحله حد اعتباری تعیین نشد." });
+    expect((await t.http.get(`${V}/admin/cases/${d.caseId}`).set(an.auth).expect(200)).body.state).toBe("declined");
   });
 
   it("the credit manager assigns cases and approves limits (never their own); the fund manager adjusts the limit", async () => {
-    const { a, caseId } = await readyToScore(404, "audited");
+    const { a, caseId } = await readyToScore(404);
     // assignment: only the credit manager, only to an analyst
     expect((await t.http.post(`${V}/admin/cases/${caseId}/assign`).set(an.auth).send({ analyst_id: an2.userId })).status).toBe(403);
     expect((await t.http.post(`${V}/admin/cases/${caseId}/assign`).set(cm.auth).send({ analyst_id: tech.userId })).body.error.code).toBe("NOT_AN_ANALYST");
@@ -81,6 +118,7 @@ describe("fund feedback 2026-11-25", () => {
     // …so the analyst prepares it and the credit manager approves
     await t.db.query(`update assessment_rounds set prepared_by = $2 where case_id = $1`, [caseId, an2.userId]);
     await t.http.post(`${V}/admin/cases/${caseId}/decision`).set(cm.auth).set(await su(t, cm, "POST", `/admin/cases/${caseId}/decision`, ok, {})).send(ok).expect(200);
+    await finishChain(t, caseId, co, ceo);
     const before = (await t.http.get(`${V}/case/limit`).set(a.admin.auth).set(a.org).expect(200)).body.limit;
 
     // the fund manager lowers Ra and takes a first-degree mortgage instead of cheques

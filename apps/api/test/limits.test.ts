@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addJalaliMonths, scoreCase, toFinancialYear, toRials } from "@tp/domain";
+import { addJalaliMonths, scoreCase, toFinancialYear, toRials, DEFAULT_SCORING_METHOD, SCORING_METHOD_V2_CHANGES } from "@tp/domain";
 import { makeApp, TestApp, staff, approvedOrg, Session } from "./helpers.js";
-import { prepareCase, submitCase, acceptAll, su, year, BOARD_NC } from "./case-flow.js";
+import { prepareCase, submitCase, acceptAll, su, year, BOARD_NC, finishChain } from "./case-flow.js";
 
 let t: TestApp;
+let ceo: Session;
 let co: Session, an: Session, anfm: Session, fm: Session, tech: Session, ops: Session;
 beforeAll(async () => {
   t = await makeApp();
@@ -13,6 +14,7 @@ beforeAll(async () => {
   fm = await staff(t, "09358880004", "fund_manager");
   tech = await staff(t, "09358880005", "technical_expert");
   ops = await staff(t, "09358880006", "super_admin");
+  ceo = await staff(t, "09358880007", "ceo");
 });
 afterAll(async () => t.close());
 
@@ -91,9 +93,11 @@ describe("credit case part 4a: tariff, visit, scoring, approval, credit limit", 
     // Rc/Ra/Re are kept with three decimals: finer values are refused instead of being rounded after the limit is computed
     expect((await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(anfm.auth).send({ ...scoreBody, guarantee: { rc: 0.9, ra: 0.8125, re: 0.7 } })).status).toBe(400);
     const sc = await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(anfm.auth).send(scoreBody).expect(200);
-    const expected = scoreCase({ activityType: "production_line", years: [year(310000), year(205000), year(138000)].map(toFinancialYear) as any, guarantee: scoreBody.guarantee });
+    // the fund's four-period method (v2): calculation A on the four years of statements
+    const expected = scoreCase({ activityType: "production_line", years: [year(310000), year(205000), year(138000), year(90000)].map(toFinancialYear), guarantee: scoreBody.guarantee },
+      { ...DEFAULT_SCORING_METHOD, ...SCORING_METHOD_V2_CHANGES, version: 2 });
     expect(sc.body.result.credit_limit).toBe(toRials(expected.creditLimit).toString());
-    expect(sc.body).toMatchObject({ round_no: 1, method_version: 1 });
+    expect(sc.body).toMatchObject({ round_no: 1, method_version: 2 }); // the fund's four-period method
 
     // ---- approval: never by the preparer; send back with a reason; re-score; approve with step-up
     await t.http.post(`${V}/admin/cases/${caseId}/scoring/submit`).set(anfm.auth).send({ summary: "شرکت تولیدی با رشد فروش مناسب؛ پیشنهاد حد با چک و سفته." }).expect(200);
@@ -106,11 +110,17 @@ describe("credit case part 4a: tariff, visit, scoring, approval, credit limit", 
     await t.http.post(`${V}/admin/cases/${caseId}/scoring/submit`).set(anfm.auth).send({ summary: "Re به ۰٫۶ کاهش یافت." }).expect(200);
     const ok = { decision: "approve", note_to_applicant: "حد اعتباری با چک و سفته؛ برای افزایش، وثیقه‌ی ملکی پیشنهاد دهید." };
     const dec = await t.http.post(`${V}/admin/cases/${caseId}/decision`).set(fm.auth).set(await su(t, fm, "POST", `/admin/cases/${caseId}/decision`, ok, {})).send(ok).expect(200);
-    const exp2 = scoreCase({ activityType: "production_line", years: [year(310000), year(205000), year(138000)].map(toFinancialYear) as any, guarantee: { rc: 0.9, ra: 0.8, re: 0.6 } });
-    expect(dec.body).toMatchObject({ case_state: "limit_issued", round_state: "approved" });
-    expect(dec.body.credit_limit.limit_rials).toBe(toRials(exp2.creditLimit).toString());
+    // the credit approval no longer issues the limit: compliance → CEO → compliance → company
+    expect(dec.body).toMatchObject({ case_state: "pending_approval", round_state: "credit_approved" });
+    const v2 = { ...DEFAULT_SCORING_METHOD, ...SCORING_METHOD_V2_CHANGES, version: 2 };
+    const exp2 = scoreCase({ activityType: "production_line", years: [year(310000), year(205000), year(138000), year(90000)].map(toFinancialYear), guarantee: { rc: 0.9, ra: 0.8, re: 0.6 } }, v2);
+    const released = await finishChain(t, caseId, co, ceo);
+    expect(released.round_state).toBe("approved");
+    expect(released.credit_limit.limit_rials).toBe(toRials(exp2.creditLimit).toString());
+    expect((await t.http.get(`${V}/admin/cases/${caseId}`).set(an.auth).expect(200)).body.state).toBe("limit_issued");
     const rounds = (await t.http.get(`${V}/admin/cases/${caseId}/rounds`).set(fm.auth).expect(200)).body;
     expect(rounds.map((r: any) => r.state)).toEqual(["approved"]); // the sent-back round was re-prepared, not duplicated
+    expect(rounds[0]).toMatchObject({ ceo_decision: "accept", committee_meeting_on: "2026-11-20", compliance_comment: expect.any(String) });
     expect(rounds[0].judgement.reasons.re).toBeTruthy();
 
     // ---- what the applicant sees: limit, validity, usage, note — no coefficients

@@ -3,6 +3,7 @@ import golden from "./fixtures/workbook-golden.json";
 import {
   band, DEFAULT_SCORING_METHOD, financialAnalysis, FinancialYear, FINANCIAL_FIELDS, limitCheck, matrixValue, scoreCase, ScoringInput,
   ScoringInputError, statement, toRials, usageLedger, validateScoringMethod,
+  SCORING_METHOD_V2_CHANGES,
 } from "../src/index.js";
 
 const close = (actual: number | null, expected: number | null, label: string) => {
@@ -149,12 +150,31 @@ describe("scoring method versions", () => {
   it("the default is valid; broken ones are reported", () => {
     expect(validateScoringMethod(DEFAULT_SCORING_METHOD)).toEqual([]);
     const bad = { ...DEFAULT_SCORING_METHOD, marginWeights: [0.5, 0.3, 0.3] as const, growthBands: [1, 1, 0, -0.5] as const };
-    expect(validateScoringMethod(bad)).toEqual(["growthBands must be 4 strictly decreasing thresholds", "marginWeights must be three weights summing to 1"]);
+    expect(validateScoringMethod(bad)).toEqual(["growthBands must be 4 strictly decreasing thresholds", "marginWeights must be three or four weights summing to 1"]);
   });
   it("a method change flows into the result", () => {
     const m = { ...DEFAULT_SCORING_METHOD, version: 2, collateral: { ...DEFAULT_SCORING_METHOD.collateral, cheque: 0.5 } };
     const r = scoreCase(sample, m);
     expect(r.methodVersion).toBe(2);
     expect(r.creditLimit).toBeCloseTo(234_360 * 1.25, 6);
+  });
+});
+
+describe("method version 2 (fund 2026-11-26): four periods", () => {
+  const v2 = { ...DEFAULT_SCORING_METHOD, ...SCORING_METHOD_V2_CHANGES, version: 2 };
+  const y3 = { ...sample.years[2], sales: sample.years[2].sales * 0.8, cogs: sample.years[2].cogs * 0.8 };
+  it("weights the margin 0.4 / 0.3 / 0.2 / 0.1 and averages growth over three changes", () => {
+    expect(validateScoringMethod(v2)).toEqual([]);
+    const years = [...sample.years, y3];
+    const r = scoreCase({ ...sample, years }, v2);
+    const st = years.map((y) => statement(y));
+    const m = st.map((s) => s.profitBeforeTax / s.sales);
+    expect(r.avgMargin).toBeCloseTo(0.4 * m[0] + 0.3 * m[1] + 0.2 * m[2] + 0.1 * m[3], 12);
+    const g = [0, 1, 2].map((i) => (st[i].sales - st[i + 1].sales) / st[i + 1].sales);
+    expect(r.avgGrowth).toBeCloseTo((g[0] + g[1] + g[2]) / 3, 12);
+    expect(r.statements).toHaveLength(4);
+  });
+  it("needs as many periods as the method's weights", () => {
+    expect(() => scoreCase(sample, v2)).toThrow(/4 periods are required/);
   });
 });

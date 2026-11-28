@@ -11,7 +11,7 @@
  * scoring rounds, fund-manager approval and the credit limit (part 4).
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { CASE, CASE_EDITABLE, CASE_ITEM, CaseState, checklistItem, casePeople, expectedSlots, FINANCIAL_FIELDS, FORM_SECTIONS, FORM_SECTION_TITLES, FormSection, ITEM_RETURNED, ItemState, jalaliYearOf, reconcileSlots, sectionProblems, statement, toFinancialYear, transition, yearProblems, figureProblems, bankTotals, StatementType, financialYears } from "@tp/domain";
+import { CASE, CASE_EDITABLE, CASE_ITEM, CaseState, checklistItem, casePeople, expectedSlots, FINANCIAL_FIELDS, FORM_SECTIONS, FORM_SECTION_TITLES, FormSection, ITEM_RETURNED, ItemState, jalaliYearOf, reconcileSlots, sectionProblems, statement, toFinancialYear, transition, yearProblems, figureProblems, bankTotals, StatementType, financialYears, financialPeriods, trialBalancePeriod } from "@tp/domain";
 import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -49,7 +49,8 @@ const err = {
 
 const KEY_IDENTITY = ["legal_name", "legal_form"] as const;
 const editable = (s: CaseState) => (CASE_EDITABLE as readonly string[]).includes(s);
-const yearsOf = (y0: number) => financialYears(y0);
+/** Periods entered: the current-year trial balance (latest + 1), then four years of statements (fund rules 2026-11-26). */
+const yearsOf = (y0: number) => financialPeriods(y0);
 
 @Injectable()
 export class CasesService {
@@ -359,6 +360,7 @@ export class CasesService {
         const totals = figureProblems(declared).length ? null : statementTotals(declared);
         return {
           fiscal_year: y, statement_type: r?.statement_type ?? null, declared, totals, problems: r ? yearProblems(declared) : ["missing"],
+          trial_balance: y === c.latest_fiscal_year + 1, through_month: r?.through_month ?? null,
           ...(staff ? { verified: r?.verified ?? null, verified_totals: r?.verified && !figureProblems(r.verified).length ? statementTotals(r.verified) : null, adjustments: adjustments.filter((a: any) => a.fiscal_year === y) } : {}),
         };
       }),
@@ -421,13 +423,17 @@ export class CasesService {
       const c = await this.caseOf(q, req.org!.id, true);
       if (!["opened", "in_preparation", "under_review"].includes(c.state)) throw err.locked(c.state);
       if (!yearsOf(c.latest_fiscal_year).includes(year)) throw err.year();
-      if (input.statement_type === "balance_sheet" && year !== c.latest_fiscal_year) throw err.balanceSheetYear();
+      // the current-year period is the trial balance (to the end of the last completed season); the others are statements
+      const isTb = year === c.latest_fiscal_year + 1;
+      if (isTb !== (input.statement_type === "trial_balance")) throw new ApiError(422, "TRIAL_BALANCE_PERIOD", "The current-year period is the trial balance; earlier years are statements", "دوره‌ی سال جاری، تراز آزمایشی است و سال‌های قبل، صورت مالی.");
+      if (input.statement_type === "balance_sheet") throw err.balanceSheetYear();
+      const throughMonth = isTb ? trialBalancePeriod(tehranToday()).throughMonth : null;
       const bad = Object.entries(input.figures).filter(([k, v]) => !(FINANCIAL_FIELDS as readonly string[]).includes(k) || !/^-?(0|[1-9]\d{0,14})$/.test(v)).map(([k]) => k);
       if (bad.length) throw err.figures(bad);
       await q.query(
-        `insert into case_financials (case_id, fiscal_year, statement_type, declared, updated_by) values ($1,$2,$3,$4,$5)
-         on conflict (case_id, fiscal_year) do update set statement_type = excluded.statement_type, declared = excluded.declared, updated_by = excluded.updated_by, updated_at = now()`,
-        [c.id, year, input.statement_type, JSON.stringify(input.figures), req.user!.id],
+        `insert into case_financials (case_id, fiscal_year, statement_type, declared, updated_by, through_month) values ($1,$2,$3,$4,$5,$6)
+         on conflict (case_id, fiscal_year) do update set statement_type = excluded.statement_type, declared = excluded.declared, updated_by = excluded.updated_by, through_month = excluded.through_month, updated_at = now()`,
+        [c.id, year, input.statement_type, JSON.stringify(input.figures), req.user!.id, throughMonth],
       );
       await this.touch(q, c, req.user!.id);
       await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: "case.financials_saved", entityType: "case", entityId: c.id, after: { fiscal_year: year } });

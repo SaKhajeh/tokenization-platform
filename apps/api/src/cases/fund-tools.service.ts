@@ -147,13 +147,13 @@ export class FundToolsService {
       if (!cur) throw err.noLimit();
       const round = (await q.query(`select * from assessment_rounds where id = $1`, [cur.round_id])).rows[0];
       const c = (await q.query(`select * from cases where id = $1`, [cur.case_id])).rows[0];
-      const fin = (await q.query(`select fiscal_year, verified, statement_type from case_financials where case_id = $1`, [cur.case_id])).rows;
+      const fin = (await q.query(`select fiscal_year, verified, statement_type, through_month from case_financials where case_id = $1`, [cur.case_id])).rows;
       const m = (await q.query(`select * from scoring_methods where version = $1`, [round.method_version])).rows[0];
       const method = { ...m.config, version: m.version };
       const base = cur.adjustment?.judgement ?? { rc: round.judgement.rc, ra: round.judgement.ra, re: round.judgement.re };
       const judgement = { rc: input.rc ?? base.rc, ra: input.ra ?? base.ra, re: input.re ?? base.re };
       const collateral: CollateralClass = input.collateral ?? cur.collateral;
-      const r = this.limits.compute(c, fin, method, { activity_type: round.activity_type, guarantee: judgement, reasons: round.judgement.reasons, facility: round.facility ?? undefined } as any);
+      const r = this.limits.compute(c, fin, method, { activity_type: round.activity_type, guarantee: judgement, reasons: round.judgement.reasons, facility: round.facility ?? undefined, trial_balance_check: round.outputs?.trial_balance_check ?? null } as any);
       const limitRials = toRials(r.guarantee.ceiling[collateral]);
       if (limitRials.toString() === String(cur.limit_rials) && collateral === cur.collateral && JSON.stringify(judgement) === JSON.stringify(base)) throw err.sameLimit();
       const ceilings: Record<string, Record<string, string>> = { guarantee: {}, facility: {} };

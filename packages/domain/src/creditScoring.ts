@@ -89,7 +89,8 @@ export interface ScoringMethod {
   c2Bands: Bands;       // Cr columns: equity ÷ sales
   collateral: Record<CollateralClass, number>;
   /** Weights of Y0, Y-1, Y-2 in the average profit-to-sales. */
-  marginWeights: readonly [number, number, number];
+  /** One weight per period, latest first; their count is the number of periods scored (3 in the workbook, 4 since v2). */
+  marginWeights: readonly number[];
   /** Crl = clamp(a − b × debt-to-assets of Y0, 0, 1). */
   crl: { a: number; b: number };
   /** Income tax on profit before tax (used only for net profit in the report; W6: not floored). */
@@ -97,6 +98,12 @@ export interface ScoringMethod {
   /** Collateral class whose guarantee ceiling is the announced credit limit (D-C2). */
   limitCollateral: CollateralClass;
 }
+
+/**
+ * The fund's method since 2026-11-26 (version 2): four periods, margin weights 0.4 / 0.3 / 0.2 / 0.1, growth averaged
+ * over three year-to-year changes; everything else as in the workbook (version 1, DEFAULT_SCORING_METHOD).
+ */
+export const SCORING_METHOD_V2_CHANGES = { marginWeights: [0.4, 0.3, 0.2, 0.1] as readonly number[] };
 
 export const DEFAULT_SCORING_METHOD: ScoringMethod = {
   version: 1,
@@ -136,7 +143,7 @@ export function validateScoringMethod(m: ScoringMethod): string[] {
     if (b.length !== 4 || !(b[0] > b[1] && b[1] > b[2] && b[2] > b[3])) errs.push(`${name} must be 4 strictly decreasing thresholds`);
   for (const c of COLLATERAL_CLASSES) if (!(m.collateral[c] > 0)) errs.push(`collateral.${c} must be > 0`);
   const w = m.marginWeights;
-  if (w.length !== 3 || w.some((x) => !unit(x)) || Math.abs(w[0] + w[1] + w[2] - 1) > 1e-9) errs.push("marginWeights must be three weights summing to 1");
+  if (w.length < 3 || w.length > 4 || w.some((x) => !unit(x)) || Math.abs(w.reduce((a, b) => a + b, 0) - 1) > 1e-9) errs.push("marginWeights must be three or four weights summing to 1");
   if (!unit(m.taxRate)) errs.push("taxRate must be in 0..1");
   return errs;
 }
@@ -320,8 +327,8 @@ export interface Judgement {
 
 export interface ScoringInput {
   activityType: ActivityType;
-  /** Latest year first: [Y0, Y-1, Y-2]. */
-  years: readonly [FinancialYear, FinancialYear, FinancialYear];
+  /** Latest period first (as many as the method's margin weights): [Y0, Y-1, Y-2(, Y-3)], or [trial balance, Y0, …]. */
+  years: readonly FinancialYear[];
   guarantee: Judgement;
   /** The workbook has separate Rc/Ra/Re cells for short-term facilities (M24:M26); defaults to `guarantee`. */
   facility?: Judgement;
@@ -334,8 +341,8 @@ export interface CeilingSet {
 
 export interface ScoringResult {
   methodVersion: number;
-  statements: [Statement, Statement, Statement];
-  ratios: [ScoringRatios, ScoringRatios, ScoringRatios];
+  statements: Statement[];
+  ratios: ScoringRatios[];
   avgMargin: number;
   avgGrowth: number;
   guaranteeBase: number;  // net sales Y0
@@ -367,14 +374,15 @@ export function scoreCase(input: ScoringInput, method: ScoringMethod = DEFAULT_S
   const errs: string[] = [];
   const beta = method.beta[input.activityType];
   if (!beta) errs.push("activity type is required");
-  if (input.years?.length !== 3) errs.push("three fiscal years are required (Q4: fewer years are not scored)");
+  const n = method.marginWeights.length;
+  if (input.years?.length !== n) errs.push(`${n} periods are required (Q4: fewer years are not scored)`);
   checkJudgement(input.guarantee, "guarantee", errs);
   const fj = input.facility ?? input.guarantee;
   if (input.facility) checkJudgement(input.facility, "facility", errs);
   if (errs.length) throw new ScoringInputError(errs);
 
-  const st = input.years.map((y) => statement(y, method.taxRate)) as [Statement, Statement, Statement];
-  const [s0, s1, s2] = st;
+  const st = input.years.map((y) => statement(y, method.taxRate));
+  const s0 = st[0];
   st.forEach((s, i) => {
     if (s.sales === 0) errs.push(`sales of Y-${i} is zero`);
     // Negative net sales make every ratio and band meaningless (a loss over negative sales reads as a profit margin)
@@ -384,10 +392,12 @@ export function scoreCase(input: ScoringInput, method: ScoringMethod = DEFAULT_S
   if (s0.totalAssets === 0) errs.push("total assets of Y0 is zero");
   if (errs.length) throw new ScoringInputError(errs);
 
-  const ratios = st.map(scoringRatios) as [ScoringRatios, ScoringRatios, ScoringRatios];
-  const [w0, w1, w2] = method.marginWeights;
-  const avgMargin = w0 * ratios[0].profitability! + w1 * ratios[1].profitability! + w2 * ratios[2].profitability!;
-  const avgGrowth = ((s1.sales - s2.sales) / s2.sales + (s0.sales - s1.sales) / s1.sales) / 2;
+  const ratios = st.map(scoringRatios);
+  // weighted margin over all periods (v1: 0.5/0.3/0.2; v2: 0.4/0.3/0.2/0.1), growth averaged over the year-to-year changes
+  const avgMargin = method.marginWeights.reduce((a, w, i) => a + w * ratios[i].profitability!, 0);
+  let growthSum = 0;
+  for (let i = 0; i < n - 1; i++) growthSum += (st[i].sales - st[i + 1].sales) / st[i + 1].sales;
+  const avgGrowth = growthSum / (n - 1);
   const guaranteeBase = s0.sales;
   const facilityBase = s0.workingCapital > 0 ? s0.workingCapital : 0;
   const c1 = s0.workingCapital / guaranteeBase;
