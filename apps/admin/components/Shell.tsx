@@ -15,7 +15,7 @@ const NAV: [string | null, Item[]][] = [
     ["/withdrawals", "برداشت‌ها", ["finance_officer", "fund_manager", "compliance_officer", "super_admin", "auditor"]],
   ]],
   ["اعتبارسنجی", [
-    ["/cases", "پرونده‌های اعتباری", ["analyst", "technical_expert", "fund_manager", "compliance_officer", "ceo", "auditor", "super_admin"]],
+    ["/cases", "پرونده‌های اعتباری", ["analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin"]],
     ["/applications", "درخواست‌های تأمین مالی", ["analyst", "fund_manager", "auditor", "super_admin"]],
   ]],
   ["مالی", [["/invoices", "صورتحساب‌ها", ["fund_manager", "finance_officer", "auditor", "super_admin"]]]],

@@ -1,10 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addJalaliMonths, scoreCase, toFinancialYear, toRials, DEFAULT_SCORING_METHOD, SCORING_METHOD_V2_CHANGES } from "@tp/domain";
 import { makeApp, TestApp, staff, approvedOrg, Session } from "./helpers.js";
-import { prepareCase, submitCase, acceptAll, su, year, BOARD_NC, finishChain } from "./case-flow.js";
+import { prepareCase, submitCase, acceptAll, su, year, BOARD_NC } from "./case-flow.js";
 
 let t: TestApp;
-let ceo: Session;
 let co: Session, an: Session, anfm: Session, fm: Session, tech: Session, ops: Session;
 beforeAll(async () => {
   t = await makeApp();
@@ -14,7 +13,6 @@ beforeAll(async () => {
   fm = await staff(t, "09358880004", "fund_manager");
   tech = await staff(t, "09358880005", "technical_expert");
   ops = await staff(t, "09358880006", "super_admin");
-  ceo = await staff(t, "09358880007", "ceo");
 });
 afterAll(async () => t.close());
 
@@ -99,22 +97,24 @@ describe("credit case part 4a: tariff, visit, scoring, approval, credit limit", 
     expect(sc.body.result.credit_limit).toBe(toRials(expected.creditLimit).toString());
     expect(sc.body).toMatchObject({ round_no: 1, method_version: 2 }); // the fund's four-period method
 
-    // ---- approval: never by the preparer; send back with a reason; re-score; approve with step-up
+    // ---- the analyst's round goes to the compliance officer (no separate credit approval, fund rules 2026-11-27):
+    //      send back with a reason → re-score → send to the fund manager (the CEO) → accept → release to the company
     await t.http.post(`${V}/admin/cases/${caseId}/scoring/submit`).set(anfm.auth).send({ summary: "شرکت تولیدی با رشد فروش مناسب؛ پیشنهاد حد با چک و سفته." }).expect(200);
-    const selfTok = await su(t, anfm, "POST", `/admin/cases/${caseId}/decision`, { decision: "approve" }, {});
-    expect((await t.http.post(`${V}/admin/cases/${caseId}/decision`).set(anfm.auth).set(selfTok).send({ decision: "approve" })).body.error.code).toBe("SELF_APPROVAL");
-    const back = { decision: "send_back", reason: "Re را با توجه به ریسک ارزی بازبینی کنید." };
-    await t.http.post(`${V}/admin/cases/${caseId}/decision`).set(fm.auth).set(await su(t, fm, "POST", `/admin/cases/${caseId}/decision`, back, {})).send(back).expect(200);
+    expect((await t.http.post(`${V}/admin/cases/${caseId}/to-ceo`).set(an.auth).send({ comment: "برای تصمیم" })).status).toBe(403); // compliance only
+    await t.http.post(`${V}/admin/cases/${caseId}/send-back`).set(co.auth).send({ reason: "Re را با توجه به ریسک ارزی بازبینی کنید." }).expect(200);
     expect((await t.http.get(`${V}/admin/cases/${caseId}`).set(an.auth).expect(200)).body.state).toBe("sent_back_to_analyst");
     await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(anfm.auth).send({ ...scoreBody, guarantee: { rc: 0.9, ra: 0.8, re: 0.6 } }).expect(200);
     await t.http.post(`${V}/admin/cases/${caseId}/scoring/submit`).set(anfm.auth).send({ summary: "Re به ۰٫۶ کاهش یافت." }).expect(200);
-    const ok = { decision: "approve", note_to_applicant: "حد اعتباری با چک و سفته؛ برای افزایش، وثیقه‌ی ملکی پیشنهاد دهید." };
-    const dec = await t.http.post(`${V}/admin/cases/${caseId}/decision`).set(fm.auth).set(await su(t, fm, "POST", `/admin/cases/${caseId}/decision`, ok, {})).send(ok).expect(200);
-    // the credit approval no longer issues the limit: compliance → CEO → compliance → company
-    expect(dec.body).toMatchObject({ case_state: "pending_approval", round_state: "credit_approved" });
+    await t.http.post(`${V}/admin/cases/${caseId}/to-ceo`).set(co.auth).send({ comment: "نتیجه‌ی کمیته‌ی اعتباری برای تصمیم مدیر صندوق." }).expect(200);
+    // the fund manager who prepared the round cannot decide on it
+    const self = { meeting_held: true, meeting_date: "2026-11-20", decision: "accept", comment: "تأیید" };
+    expect((await t.http.post(`${V}/admin/cases/${caseId}/ceo-decision`).set(anfm.auth).set(await su(t, anfm, "POST", `/admin/cases/${caseId}/ceo-decision`, self, {})).send(self)).body.error.code).toBe("SELF_APPROVAL");
+    const acc = { meeting_held: true, meeting_date: "2026-11-20", decision: "accept", comment: "جلسه‌ی کمیته برگزار شد؛ تأیید می‌شود." };
+    await t.http.post(`${V}/admin/cases/${caseId}/ceo-decision`).set(fm.auth).set(await su(t, fm, "POST", `/admin/cases/${caseId}/ceo-decision`, acc, {})).send(acc).expect(200);
+    expect((await t.http.get(`${V}/case/limit`).set(a.admin.auth).set(a.org).expect(200)).body.limit).toBeNull(); // not before the release
+    const released = (await t.http.post(`${V}/admin/cases/${caseId}/release`).set(co.auth).send({ note_to_applicant: "حد اعتباری با چک و سفته؛ برای افزایش، وثیقه‌ی ملکی پیشنهاد دهید." }).expect(200)).body;
     const v2 = { ...DEFAULT_SCORING_METHOD, ...SCORING_METHOD_V2_CHANGES, version: 2 };
     const exp2 = scoreCase({ activityType: "production_line", years: [year(310000), year(205000), year(138000), year(90000)].map(toFinancialYear), guarantee: { rc: 0.9, ra: 0.8, re: 0.6 } }, v2);
-    const released = await finishChain(t, caseId, co, ceo);
     expect(released.round_state).toBe("approved");
     expect(released.credit_limit.limit_rials).toBe(toRials(exp2.creditLimit).toString());
     expect((await t.http.get(`${V}/admin/cases/${caseId}`).set(an.auth).expect(200)).body.state).toBe("limit_issued");

@@ -342,59 +342,50 @@ export class LimitsService {
       await q.query(`update assessment_rounds set state = 'pending_approval', summary = $2 where id = $1`, [round.id, summary]);
       await this.cases.move(q, c, "pending_approval", req.user!.id);
       await closeWorkflowTasks(q, "case", caseId, req.user!.id);
-      await staffTask(q, { title: `تأیید حد اعتباری پرونده ${c.case_no}`, linkedType: "case", linkedId: caseId, role: "fund_manager", key: "case.approve_limit", dueInHours: 48 });
+      await staffTask(q, { title: `بررسی و ارسال حد اعتباری پرونده ${c.case_no} برای مدیر صندوق`, linkedType: "case", linkedId: caseId, role: "compliance_officer", key: "case.to_ceo", dueInHours: 48 });
       await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: "case.limit_sent_for_approval", entityType: "assessment_round", entityId: round.id });
       return { round_id: round.id, state: "pending_approval" };
     });
   }
 
   /**
-   * The credit approval (credit manager or fund manager, never the preparer): approve → the round goes to the
-   * compliance officer, who sends it to the CEO; send back → the analyst; decline → the case is declined.
-   * The limit itself is issued only when the compliance officer releases the CEO's accepted result (fund rules 2026-11-26).
+   * Compliance officer, on the analyst's round (fund rules revised 2026-11-27 — no separate credit approval):
+   * sends it to the fund manager (the fund's CEO) with a comment, or back to the analyst with the reason.
+   * Never on a round they prepared themselves.
    */
-  async decide(req: AppRequest, caseId: string, input: { decision: "approve" | "send_back" | "decline"; reason?: string; note_to_applicant?: string }) {
-    return this.db.tx(async (q) => {
-      const c = await this.cases.caseById(q, caseId, true);
-      if (c.state !== "pending_approval") throw err.state("Deciding the limit", c.state);
-      const round = (await q.query(`select * from assessment_rounds where case_id = $1 and state = 'pending_approval' for update`, [caseId])).rows[0];
-      if (!round) throw err.state("Deciding the limit", "no round pending approval");
-      if (round.prepared_by === req.user!.id) throw err.self();
-      const to: RoundState = input.decision === "approve" ? "credit_approved" : input.decision === "send_back" ? "sent_back" : "declined";
-      transition("round", ROUND, round.state as RoundState, to);
-      await q.query(`update assessment_rounds set state = $2, decided_by = $3, decided_at = now(), decision_reason = $4, note_to_applicant = $5 where id = $1`,
-        [round.id, to, req.user!.id, input.reason ?? null, input.note_to_applicant ?? null]);
-      await closeWorkflowTasks(q, "case", caseId, req.user!.id);
-      if (to === "credit_approved") {
-        await staffTask(q, { title: `ارسال نتیجه‌ی اعتبارسنجی پرونده ${c.case_no} به مدیرعامل`, description: input.reason, linkedType: "case", linkedId: caseId, role: "compliance_officer", key: "case.to_ceo", dueInHours: 48 });
-      } else if (to === "sent_back") {
-        await this.cases.move(q, c, "sent_back_to_analyst", req.user!.id, input.reason);
-        await staffTask(q, { title: `بازنگری محاسبه‌ی حد اعتباری پرونده ${c.case_no}`, description: input.reason, linkedType: "case", linkedId: caseId, role: "analyst", key: "case.rescore", dueInHours: 48 });
-      } else {
-        await this.cases.move(q, c, "declined", req.user!.id, input.reason);
-        await this.notifications.notify(q, { to: { orgId: c.org_id }, event: "case.declined", params: { no: c.case_no, note: input.note_to_applicant ?? "" } });
-      }
-      await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: `case.limit_${to}`, entityType: "assessment_round", entityId: round.id, after: { reason: input.reason } });
-      return { case_state: (await this.cases.caseById(q, caseId)).state, round_state: to };
-    });
-  }
-
-  /** Compliance officer: sends the credit-approved result to the CEO with a comment. */
   async toCeo(req: AppRequest, caseId: string, comment: string) {
     return this.db.tx(async (q) => {
       const c = await this.cases.caseById(q, caseId, true);
-      const round = await this.roundIn(q, caseId, "credit_approved");
-      transition("round", ROUND, "credit_approved", "ceo_review");
+      if (c.state !== "pending_approval") throw err.state("Sending to the fund manager", c.state);
+      const round = await this.roundIn(q, caseId, "pending_approval");
+      if (round.prepared_by === req.user!.id) throw err.self();
+      transition("round", ROUND, "pending_approval", "ceo_review");
       await q.query(`update assessment_rounds set state = 'ceo_review', compliance_comment = $2, compliance_by = $3, compliance_at = now() where id = $1`, [round.id, comment, req.user!.id]);
       await closeWorkflowTasks(q, "case", caseId, req.user!.id);
-      await staffTask(q, { title: `تصمیم درباره‌ی حد اعتباری پرونده ${c.case_no}`, description: comment, linkedType: "case", linkedId: caseId, role: "ceo", key: "case.ceo_decision", dueInHours: 72 });
+      await staffTask(q, { title: `تصمیم درباره‌ی حد اعتباری پرونده ${c.case_no}`, description: comment, linkedType: "case", linkedId: caseId, role: "fund_manager", key: "case.ceo_decision", dueInHours: 72 });
       await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: "case.limit_to_ceo", entityType: "assessment_round", entityId: round.id, after: { comment } });
       return { round_state: "ceo_review" };
     });
   }
 
+  async sendBack(req: AppRequest, caseId: string, reason: string) {
+    return this.db.tx(async (q) => {
+      const c = await this.cases.caseById(q, caseId, true);
+      if (c.state !== "pending_approval") throw err.state("Sending back", c.state);
+      const round = await this.roundIn(q, caseId, "pending_approval");
+      if (round.prepared_by === req.user!.id) throw err.self();
+      transition("round", ROUND, "pending_approval", "sent_back");
+      await q.query(`update assessment_rounds set state = 'sent_back', decision_reason = $2, compliance_by = $3, compliance_at = now() where id = $1`, [round.id, reason, req.user!.id]);
+      await closeWorkflowTasks(q, "case", caseId, req.user!.id);
+      await this.cases.move(q, c, "sent_back_to_analyst", req.user!.id, reason);
+      await staffTask(q, { title: `بازنگری محاسبه‌ی حد اعتباری پرونده ${c.case_no}`, description: reason, linkedType: "case", linkedId: caseId, role: "analyst", key: "case.rescore", dueInHours: 48 });
+      await this.audit.append(q, { ...actor(req), orgId: c.org_id, action: "case.limit_sent_back", entityType: "assessment_round", entityId: round.id, after: { reason } });
+      return { round_state: "sent_back", case_state: "sent_back_to_analyst" };
+    });
+  }
+
   /**
-   * CEO: confirms the committee meeting on the limit was held, may edit the numbers (guarantee and facility ceilings
+   * Fund manager (the fund's CEO): confirms the committee meeting on the limit was held, may edit the numbers (guarantee and facility ceilings
    * per collateral), accepts or declines, and comments. Goes back to the compliance officer.
    */
   async ceoDecision(req: AppRequest, caseId: string, input: { meeting_held: true; meeting_date: string; decision: "accept" | "decline"; comment: string;

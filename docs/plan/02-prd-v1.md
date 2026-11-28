@@ -92,9 +92,9 @@ Single-user mode (D17): if an org has exactly one active member and single_user_
 | tokenisation_officer | Platform operator | Configure token from approved terms, deploy, mint/burn requests, chain monitoring. |
 | analyst | Fund | Credit case review, financial verification, site visit, scoring rounds; screening and limit checks of applications; DD coordination; monitoring. |
 | technical_expert | Fund | Site visits and technical review of credit cases; receives internal notes (doc 07 §6b). |
-| credit_manager | Fund | مدیر اعتبارات: every analyst permission; assigns cases to analysts; gives the credit approval of limit rounds (never their own) (D-C31, D-C33). |
-| ceo | Fund | مدیرعامل صندوق: after the compliance officer's referral, confirms the committee meeting was held, may edit the guarantee and facility ceilings, accepts or declines the limit with a comment (D-C37). |
-| compliance_officer (credit case) | Fund | Sends the credit-approved result to the CEO with a comment; releases the CEO's decision to the company with explanations (D-C37). |
+| credit_manager | Fund | مدیر اعتبارات: every analyst permission; assigns cases to analysts (D-C31). |
+| compliance_officer (credit case) | Fund | Sends the analyst's round to the fund manager with a comment, or back to the analyst; releases the fund manager's decision to the company with explanations (D-C37, D-C38). |
+| fund_manager (credit case) | Fund | The fund's CEO: confirms the committee meeting was held, may edit the guarantee and facility ceilings, accepts or declines the limit with a comment (D-C37, D-C38). |
 | external_expert | Fund (guest) | Access only to the applications assigned to them by task; submits evaluation reports. |
 | committee_member | Fund | Votes on applications. |
 | fund_manager | Fund | Approves credit limits (never the analyst who prepared the round); sets the fee tariff, rate policy and scoring method; final approval of terms and listing; approves withdrawals at or above the threshold, disbursements and payout runs; waives fees; calls guarantees. |

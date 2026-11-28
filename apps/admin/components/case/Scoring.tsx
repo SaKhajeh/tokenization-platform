@@ -20,10 +20,10 @@ const three = (x: string) => /^(0(\.\d{1,3})?|1(\.0{1,3})?)$/.test(latin(x));
 const CLASSES = ["cheque", "mortgage_2", "mortgage_1"] as const;
 
 /**
- * S-19 and the decision chain (fund rules 2026-11-26): the analyst sees both calculations live and sends a round;
- * the credit manager (or fund manager) gives the credit approval; the compliance officer sends it to the CEO; the CEO
- * confirms the committee meeting and accepts (possibly editing the ceilings) or declines; the compliance officer
- * releases it to the company. The fund manager can adjust an issued limit.
+ * S-19 and the decision chain (fund rules 2026-11-26, revised 2026-11-27): the analyst sees both calculations live and
+ * sends a round; the compliance officer sends it to the fund manager (the fund's CEO) with a comment, or back to the
+ * analyst; the fund manager confirms the committee meeting and accepts (possibly editing the ceilings) or declines;
+ * the compliance officer releases it to the company. The fund manager can adjust an issued limit.
  */
 export function Scoring({ c, reload, meId, isAnalyst, isFundManager, canAdjust, isCompliance, isCeo }: {
   c: StaffCase; reload: () => void; meId: string; isAnalyst: boolean; isFundManager: boolean; canAdjust?: boolean; isCompliance?: boolean; isCeo?: boolean;
@@ -78,12 +78,8 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager, canAdjust, 
     rounds.reload(); reload();
   });
   const send = useAction(async () => { await api.post(`/admin/cases/${c.id}/scoring/submit`, { summary: text.trim() }); after(); });
-  const decide = useAction(async (_k, decision: "approve" | "send_back" | "decline") => {
-    const body = decision === "approve" ? { decision, ...(text.trim() ? { reason: text.trim() } : {}) } : { decision, reason: text.trim() };
-    await stepUp("POST", `/admin/cases/${c.id}/decision`, body, { title: decision === "approve" ? "تأیید اعتباری" : decision === "send_back" ? "بازگشت به کارشناس" : "رد پرونده" });
-    after();
-  });
   const toCeo = useAction(async () => { await api.post(`/admin/cases/${c.id}/to-ceo`, { comment: text.trim() }); after(); });
+  const sendBack = useAction(async () => { await api.post(`/admin/cases/${c.id}/send-back`, { reason: text.trim() }); after(); });
   const ceo = useAction(async (_k, decision: "accept" | "decline", r: Round) => {
     const changed = (part: "guarantee" | "facility") => Object.fromEntries(Object.entries(edits[part])
       .map(([q, t]) => [q, (BigInt(latin(t).replace(/\D/g, "") || "0") * 10n).toString()] as [string, string])
@@ -98,7 +94,7 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager, canAdjust, 
 
   const canScore = isAnalyst && ["documents_complete", "scoring", "sent_back_to_analyst"].includes(c.state);
   const r = (s: string) => rounds.data?.find((x) => x.state === s);
-  const preparing = r("preparing"), pending = r("pending_approval"), approved = r("credit_approved"), atCeo = r("ceo_review"), ceoDone = r("ceo_accepted") ?? r("ceo_declined");
+  const preparing = r("preparing"), pending = r("pending_approval"), atCeo = r("ceo_review"), ceoDone = r("ceo_accepted") ?? r("ceo_declined");
   const missing: string[] = run.error?.code === "SCORING_NOT_READY" ? run.error.details?.missing ?? [] : [];
   const resultView = (x: Round) => x.result.alternatives
     ? <TwoCalcs a={x.result.alternatives.a} b={x.result.alternatives.b} chosen={x.result.chosen ?? "a"} bError={x.result.alternatives.b_error} />
@@ -143,51 +139,36 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager, canAdjust, 
       )}
 
       {preparing && isAnalyst && preparing.prepared_by === meId && (
-        <Card highlight title={`دور ${fa(preparing.round_no)} آماده‌ی ارسال برای تأیید اعتباری`}>
+        <Card highlight title={`دور ${fa(preparing.round_no)} آماده‌ی ارسال برای کارشناس انطباق`}>
           <div className="stack">
             <p>حد محاسبه‌شده: <strong>{toman(preparing.result.credit_limit)}</strong> (محاسبه‌ی {preparing.result.chosen === "b" ? "ب" : "الف"})</p>
-            <TextArea label="خلاصه برای کمیته و مدیر اعتبارات" value={text} onValue={setText} rows={3} />
+            <TextArea label="خلاصه برای کمیته و کارشناس انطباق" value={text} onValue={setText} rows={3} />
             <ErrorBanner error={send.error} />
-            <Button busy={send.busy} disabled={text.trim().length < 10} onClick={() => send.run()}>ارسال برای تأیید اعتباری</Button>
+            <Button busy={send.busy} disabled={text.trim().length < 10} onClick={() => send.run()}>ارسال برای کارشناس انطباق</Button>
           </div>
         </Card>
       )}
 
-      {pending && isFundManager && (
-        <Card highlight title={`تأیید اعتباری دور ${fa(pending.round_no)}`}>
+      {pending && (
+        <Card highlight title={`ارسال دور ${fa(pending.round_no)} برای مدیر صندوق`}>
           <div className="stack">
             {resultView(pending)}
             {roundFacts(pending)}
-            {pending.prepared_by === meId ? <Banner tone="warning">این دور را خودتان آماده کرده‌اید؛ مدیر اعتبارات یا مدیر صندوق دیگری باید تصمیم بگیرد.</Banner> : (<>
-              <TextArea label="توضیح (برای بازگشت یا رد الزامی است)" value={text} onValue={setText} rows={2} />
-              <ErrorBanner error={decide.error} />
+            {!isCompliance ? <p className="t-muted">منتظر بررسی کارشناس انطباق.</p>
+              : pending.prepared_by === meId ? <Banner tone="warning">این دور را خودتان آماده کرده‌اید؛ کارشناس انطباق دیگری باید آن را ارسال کند.</Banner> : (<>
+              <TextArea label="نظر کارشناس انطباق برای مدیر صندوق (یا دلیل بازگشت)" value={text} onValue={setText} rows={3} />
+              <ErrorBanner error={toCeo.error ?? sendBack.error} />
               <div className="row">
-                <Button busy={decide.busy} onClick={() => decide.run("approve")}>تأیید اعتباری</Button>
-                <Button variant="outline" busy={decide.busy} disabled={text.trim().length < 5} onClick={() => decide.run("send_back")}>بازگشت به کارشناس</Button>
-                <Button variant="danger" busy={decide.busy} disabled={text.trim().length < 5} onClick={() => decide.run("decline")}>رد</Button>
+                <Button busy={toCeo.busy} disabled={text.trim().length < 5} onClick={() => toCeo.run()}>ارسال برای مدیر صندوق</Button>
+                <Button variant="outline" busy={sendBack.busy} disabled={text.trim().length < 5} onClick={() => sendBack.run()}>بازگشت به کارشناس</Button>
               </div>
-              <p className="t-small t-muted">تأیید اعتباری حد را صادر نمی‌کند: نتیجه از طریق کارشناس انطباق نزد مدیرعامل می‌رود.</p>
             </>)}
           </div>
         </Card>
       )}
 
-      {approved && (
-        <Card highlight title="ارسال نتیجه برای مدیرعامل">
-          <div className="stack">
-            {resultView(approved)}
-            {roundFacts(approved)}
-            {isCompliance ? (<>
-              <TextArea label="نظر کارشناس انطباق برای مدیرعامل" value={text} onValue={setText} rows={3} />
-              <ErrorBanner error={toCeo.error} />
-              <Button busy={toCeo.busy} disabled={text.trim().length < 5} onClick={() => toCeo.run()}>ارسال برای مدیرعامل</Button>
-            </>) : <p className="t-muted">منتظر ارسال توسط کارشناس انطباق.</p>}
-          </div>
-        </Card>
-      )}
-
       {atCeo && (
-        <Card highlight title="تصمیم مدیرعامل">
+        <Card highlight title="تصمیم مدیر صندوق (مدیرعامل)">
           <div className="stack">
             {resultView(atCeo)}
             {roundFacts(atCeo)}
@@ -209,13 +190,13 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager, canAdjust, 
                 </table></div>
                 <span className="t-small t-muted">حد اعتباری شرکت، سقف ضمانت‌نامه با چک و سفته است.</span>
               </div>
-              <TextArea label="نظر مدیرعامل" value={text} onValue={setText} rows={3} />
+              <TextArea label="نظر مدیر صندوق" value={text} onValue={setText} rows={3} />
               <ErrorBanner error={ceo.error} />
               <div className="row">
                 <Button busy={ceo.busy} disabled={!meeting.held || !meeting.date || text.trim().length < 5} onClick={() => ceo.run("accept", atCeo)}>پذیرش</Button>
                 <Button variant="danger" busy={ceo.busy} disabled={!meeting.held || !meeting.date || text.trim().length < 5} onClick={() => ceo.run("decline", atCeo)}>رد درخواست</Button>
               </div>
-            </>) : <p className="t-muted">منتظر تصمیم مدیرعامل.</p>}
+            </>) : <p className="t-muted">منتظر تصمیم مدیر صندوق.</p>}
           </div>
         </Card>
       )}
@@ -223,10 +204,10 @@ export function Scoring({ c, reload, meId, isAnalyst, isFundManager, canAdjust, 
       {ceoDone && (
         <Card highlight title="اعلام نتیجه به شرکت">
           <div className="stack">
-            <KV rows={[["تصمیم مدیرعامل", ceoDone.ceo_decision === "accept" ? <span key="a" className="chip chip-success">پذیرش</span> : <span key="d" className="chip chip-danger">رد</span>],
-              ["جلسه‌ی کمیته", jdate(ceoDone.committee_meeting_on)], ["نظر مدیرعامل", ceoDone.ceo_comment ?? "—"], ["زمان", jdatetime(ceoDone.ceo_at)]]} />
+            <KV rows={[["تصمیم مدیر صندوق", ceoDone.ceo_decision === "accept" ? <span key="a" className="chip chip-success">پذیرش</span> : <span key="d" className="chip chip-danger">رد</span>],
+              ["جلسه‌ی کمیته", jdate(ceoDone.committee_meeting_on)], ["نظر مدیر صندوق", ceoDone.ceo_comment ?? "—"], ["زمان", jdatetime(ceoDone.ceo_at)]]} />
             {ceoDone.ceo_decision === "accept" && (<>
-              {ceoDone.ceo_overrides && <Banner tone="info">مدیرعامل سقف‌ها را ویرایش کرده است؛ ارقام زیر نهایی است.</Banner>}
+              {ceoDone.ceo_overrides && <Banner tone="info">مدیر صندوق سقف‌ها را ویرایش کرده است؛ ارقام زیر نهایی است.</Banner>}
               <CeilingsTable calc={{ ...ceoDone.result, guarantee: { ceiling: { ...ceoDone.result.guarantee.ceiling, ...(ceoDone.ceo_overrides?.guarantee ?? {}) } }, facility: { ceiling: { ...ceoDone.result.facility.ceiling, ...(ceoDone.ceo_overrides?.facility ?? {}) } } }} />
             </>)}
             {isCompliance ? (<>

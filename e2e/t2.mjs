@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 const { R } = JSON.parse(readFileSync(`${DIR}/run.json`, "utf8"));
 const b = await browser();
 const p = await page(b);
-await login(p, ADMIN, "09350000001");
+await login(p, ADMIN, "09350000003"); // compliance officer
 await shot(p, "10-admin-dashboard");
 await p.getByRole("link", { name: "احراز هویت سازمان‌ها" }).click();
 await p.getByRole("link", { name: "شرکت فناوران حسگر" }).first().click();

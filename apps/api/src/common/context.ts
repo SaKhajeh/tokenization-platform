@@ -4,7 +4,6 @@ export type OrgRole = "org_admin" | "preparer" | "approver" | "viewer";
 export type StaffRole =
   | "super_admin"
   | "credit_manager"
-  | "ceo"
   | "compliance_officer"
   | "finance_officer"
   | "tokenisation_officer"

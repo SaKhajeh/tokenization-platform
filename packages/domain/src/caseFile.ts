@@ -417,17 +417,17 @@ export const VISIT: Machine<VisitState> = {
 
 /** One scoring round: the analyst prepares, the fund manager (never the preparer) approves, sends back or declines. */
 /**
- * A scoring round (fund rules 2026-11-26): the analyst prepares it; the credit manager (or fund manager) approves it,
- * sends it back or declines it; after the credit approval the compliance officer sends the result to the CEO with a
- * comment; the CEO confirms the committee meeting was held and accepts (possibly editing the numbers) or declines;
- * the compliance officer then releases the result to the company with an explanation — only then is a limit issued.
+ * A scoring round (fund rules 2026-11-26, revised 2026-11-27): the analyst prepares it and sends it; the compliance
+ * officer sends it to the fund manager (= the fund's CEO) with a comment, or back to the analyst; the fund manager
+ * confirms the committee meeting was held and accepts (possibly editing the numbers) or declines with a comment; the
+ * compliance officer then releases the result to the company with an explanation — only then is a limit issued.
+ * Nobody moves a round they prepared.
  */
-export type RoundState = "preparing" | "pending_approval" | "sent_back" | "credit_approved" | "ceo_review" | "ceo_accepted" | "ceo_declined" | "approved" | "declined";
+export type RoundState = "preparing" | "pending_approval" | "sent_back" | "ceo_review" | "ceo_accepted" | "ceo_declined" | "approved" | "declined";
 export const ROUND: Machine<RoundState> = {
   preparing: ["pending_approval"],
-  pending_approval: ["credit_approved", "sent_back", "declined"],
+  pending_approval: ["ceo_review", "sent_back"],
   sent_back: ["pending_approval"],
-  credit_approved: ["ceo_review"],
   ceo_review: ["ceo_accepted", "ceo_declined"],
   ceo_accepted: ["approved"],
   ceo_declined: ["declined"],

@@ -180,7 +180,7 @@ export class CasesController {
   }
 
   @Get("admin/scoring-method")
-  @StaffOnly("compliance_officer", "ceo", "fund_manager", "analyst", "auditor", "super_admin")
+  @StaffOnly("compliance_officer", "fund_manager", "analyst", "auditor", "super_admin")
   method() {
     return this.limits.method();
   }
@@ -228,7 +228,7 @@ export class CasesController {
   }
 
   @Get("admin/checklist-templates")
-  @StaffOnly("ceo", "analyst", "fund_manager", "compliance_officer", "super_admin")
+  @StaffOnly("analyst", "fund_manager", "compliance_officer", "super_admin")
   adminTemplates() {
     return this.tools.templates();
   }
@@ -248,7 +248,7 @@ export class CasesController {
     return this.tools.templateComplete(req, parse(z.string().regex(/^\d-\d$/), code), b.document_id, b.sha256);
   }
 
-  /** Compliance officer: sends the credit-approved result to the CEO with a comment (fund rules 2026-11-26). */
+  /** Compliance officer: sends the analyst's round to the fund manager (the fund's CEO) with a comment (fund rules 2026-11-27). */
   @Post("admin/cases/:id/to-ceo")
   @StaffOnly("compliance_officer")
   @HttpCode(200)
@@ -256,9 +256,17 @@ export class CasesController {
     return this.limits.toCeo(req, parse(zId, p).id, parse(z.object({ comment: zText(5, 3000) }), body).comment);
   }
 
-  /** CEO: confirms the committee meeting was held, may edit the ceilings, accepts or declines with a comment. */
+  /** Compliance officer: sends the analyst's round back to the analyst with the reason. */
+  @Post("admin/cases/:id/send-back")
+  @StaffOnly("compliance_officer")
+  @HttpCode(200)
+  sendBack(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
+    return this.limits.sendBack(req, parse(zId, p).id, parse(z.object({ reason: zText(5, 3000) }), body).reason);
+  }
+
+  /** Fund manager (the fund's CEO): confirms the committee meeting was held, may edit the ceilings, accepts or declines with a comment. */
   @Post("admin/cases/:id/ceo-decision")
-  @StaffOnly("ceo")
+  @StaffOnly("fund_manager")
   @StepUp()
   @HttpCode(200)
   ceoDecision(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
@@ -321,33 +329,33 @@ export class CasesController {
 
   /** Staff directory for pickers (visit visitor, note recipients): active staff with a role, optionally one role. */
   @Get("admin/staff")
-  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "finance_officer", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "finance_officer", "super_admin")
   staffList(@Query() query: unknown) {
     return this.comments.staffDirectory(parse(z.object({ role: z.string().max(40).optional() }), query).role);
   }
   /** «یادداشت‌های داخلی برای شما». */
   @Get("admin/notes")
-  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "super_admin")
   notes(@Req() req: AppRequest) {
     return this.comments.myNotes(req);
   }
 
   /** §6a: open a case file in the viewer, or download it — both logged. */
   @Get("admin/cases/:id/files/:fileId/:action")
-  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor")
   openFile(@Req() req: AppRequest, @Param() p: unknown) {
     const { id, fileId, action } = parse(z.object({ id: zUuid, fileId: zUuid, action: z.enum(["view", "download"]) }), p);
     return this.cases.openFile(req, id, fileId, action);
   }
 
   @Get("admin/cases")
-  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   list(@Query() query: unknown) {
     return this.cases.list(parse(z.object({ state: z.string().max(40).optional() }), query).state);
   }
 
   @Get("admin/cases/:id")
-  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   get(@Param() p: unknown) {
     return this.cases.get(parse(zId, p).id);
   }
@@ -425,13 +433,13 @@ export class CasesController {
 
   /** The fund's report (S-18/S-19): pre-filled from the case, with inquiries, red flags, ratios and the analysis sheet. */
   @Get("admin/cases/:id/report")
-  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   caseReport(@Param() p: unknown) {
     return this.report.report(parse(zId, p).id);
   }
 
   @Get("admin/cases/:id/visit")
-  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   staffVisit(@Param() p: unknown) {
     return this.limits.staffVisit(parse(zId, p).id);
   }
@@ -478,24 +486,13 @@ export class CasesController {
   }
 
   @Get("admin/cases/:id/rounds")
-  @StaffOnly("compliance_officer", "ceo", "analyst", "fund_manager", "auditor", "super_admin")
+  @StaffOnly("compliance_officer", "analyst", "fund_manager", "auditor", "super_admin")
   rounds(@Param() p: unknown) {
     return this.limits.rounds(parse(zId, p).id);
   }
 
-  @Post("admin/cases/:id/decision")
-  @HttpCode(200)
-  @StaffOnly("fund_manager", "credit_manager") // the credit manager may approve limits too (fund feedback 2026-11-25); never the preparer
-  @StepUp()
-  decide(@Req() req: AppRequest, @Param() p: unknown, @Body() body: unknown) {
-    const b = parse(z.object({
-      decision: z.enum(["approve", "send_back", "decline"]), reason: z.string().trim().max(3000).optional(), note_to_applicant: z.string().trim().max(3000).optional(),
-    }).refine((x) => x.decision === "approve" || (x.reason && x.reason.length >= 5), "a reason is required to send back or decline"), body);
-    return this.limits.decide(req, parse(zId, p).id, b);
-  }
-
   @Get("admin/orgs/:id/credit-limit")
-  @StaffOnly("compliance_officer", "ceo", "analyst", "fund_manager", "finance_officer", "auditor", "super_admin")
+  @StaffOnly("compliance_officer", "analyst", "fund_manager", "finance_officer", "auditor", "super_admin")
   staffLimit(@Param() p: unknown) {
     return this.limits.staffLimit(parse(zId, p).id);
   }

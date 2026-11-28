@@ -1,6 +1,6 @@
 # User stories — what the platform supports today
 
-_Version 2 · 2026-11-26 · Based on the code on `main` (master plan v0.26). Stories marked **(API only)** work in the
+_Version 3 · 2026-11-27 · Based on the code on `main` (master plan v0.27). Stories marked **(API only)** work in the
 backend but have no screen yet. Update this document together with the code (01 §7)._
 
 Three groups use the platform: **companies that invest**, **companies that want financing (applicants)**, and **fund
@@ -66,16 +66,15 @@ flowchart TD
   subgraph Fund staff
     S1[Review every item<br/>accept / fix / reject] --> S2[Verify and lock figures, visit]
     S2 --> S3[Analyst: calculation A and B<br/>B only if higher and checked]
-    S3 --> S4[Credit approval: credit manager or fund manager — OTP]
-    S4 --> S6[Compliance officer → CEO with a comment]
-    S6 --> S7[CEO: committee meeting held, edit ceilings, accept or decline — OTP]
+    S3 --> S6[Compliance officer → fund manager with a comment]
+    S6 --> S7[Fund manager, the CEO: committee meeting held, edit ceilings, accept or decline — OTP]
     S7 --> S8[Compliance officer releases to the company with explanations]
     S5[Fund manager may adjust the limit later]
   end
   A3 --> S1
   S1 -. sent back .-> A2
   S2 --> A4
-  S4 -. sent back .-> S3
+  S6 -. sent back .-> S3
   S8 --> A5
   A5 -.-> S5
 ```
@@ -123,15 +122,13 @@ flowchart TD
 
 **Analyst** — takes a case; reviews each document in a viewer (every open is logged) and each form section; asks for extra documents; returns the case or declares documents complete; corrects figures with a reason and locks them; records credit-bureau and Sana inquiries **(API only)**; proposes the visit and the visitor; scores with Rc, Ra, Re and reasons while watching both calculations live (A: four years of statements; B: trial balance + three years); if B is higher, checks the trial balance against the tax returns and other documents before B can be used; sends the round with a summary; records guarantees the company already holds **(API only)**; screens applications and runs the limit check; leaves internal notes **(API only)**.
 
-**Credit manager (مدیر اعتبارات)** — everything an analyst does, plus: divides cases between analysts (the queue shows who owns each case, and each analyst has "my cases"); gives the credit approval of a round (or sends it back or declines it) with OTP — never one they prepared. The approval goes to the compliance officer; it does not issue the limit.
+**Credit manager (مدیر اعتبارات)** — everything an analyst does, plus dividing cases between analysts (the queue shows who owns each case, and each analyst has "my cases").
 
-**Compliance officer (credit case)** — sends the credit-approved result to the CEO with a comment; after the CEO's decision, releases it to the company with an explanation of the numbers (this issues the limit, or tells the company it was declined).
-
-**CEO (مدیرعامل صندوق)** — confirms the committee meeting on the limit was held and enters its date; sees both calculations, each period separately (the trial balance marked as not annualised), and the guarantee and facility ceilings for each collateral; may edit those numbers; accepts or declines with a comment, with OTP.
+**Compliance officer (credit case)** — receives the analyst's round, sends it to the fund manager with a comment or back to the analyst with the reason (never a round they prepared); after the fund manager's decision, releases it to the company with an explanation of the numbers (this issues the limit, or tells the company it was declined).
 
 **Technical expert** — files the visit report and records originals received.
 
-**Fund manager** — gives the credit approval as well (never their own round); **adjusts an issued limit** up or down by changing Rc/Ra/Re or the collateral class, with a live preview, a reason and OTP (the old limit is kept in history; the company is notified); **exempts a company from a fee in advance** (assessment or application fee, OTP; unpaid invoices are waived), or waives single invoices; publishes fee tariff versions (a fee can also be set to zero for everyone); uploads templates for checklist items (currently the credit-inquiry form only); approves large withdrawals (10 billion rials and above); edits the scoring method and rate policy **(API only)**.
+**Fund manager (the fund's CEO)** — decides on each limit after the compliance officer's referral: confirms the committee meeting was held and enters its date; sees both calculations, each period separately (the trial balance marked as not annualised), and the guarantee and facility ceilings for each collateral; may edit those numbers; accepts or declines with a comment, with OTP (never a round they prepared); **adjusts an issued limit** up or down by changing Rc/Ra/Re or the collateral class, with a live preview, a reason and OTP (the old limit is kept in history; the company is notified); **exempts a company from a fee in advance** (assessment or application fee, OTP; unpaid invoices are waived), or waives single invoices; publishes fee tariff versions (a fee can also be set to zero for everyone); uploads templates for checklist items (currently the credit-inquiry form only); approves large withdrawals (10 billion rials and above); edits the scoring method and rate policy **(API only)**.
 
 **Finance officer** — takes withdrawals into the finance queue or rejects them, sends them through Jibit Cobank with OTP; sees invoices; trial balance **(API only)**.
 

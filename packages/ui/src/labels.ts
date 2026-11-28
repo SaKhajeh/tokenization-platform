@@ -93,12 +93,11 @@ export const VOCAB: Record<string, Vocab> = {
   },
   round: {
     preparing: ["در حال آماده‌سازی", "neutral"],
-    pending_approval: ["در انتظار تأیید اعتباری", "warning"],
+    pending_approval: ["نزد کارشناس انطباق", "warning"],
     sent_back: ["بازگشت برای بازبینی", "warning"],
-    credit_approved: ["تأیید اعتباری؛ نزد کارشناس انطباق", "info"],
-    ceo_review: ["نزد مدیرعامل", "warning"],
-    ceo_accepted: ["پذیرش مدیرعامل؛ آماده‌ی اعلام", "info"],
-    ceo_declined: ["رد مدیرعامل؛ آماده‌ی اعلام", "danger"],
+    ceo_review: ["نزد مدیر صندوق", "warning"],
+    ceo_accepted: ["پذیرش مدیر صندوق؛ آماده‌ی اعلام", "info"],
+    ceo_declined: ["رد مدیر صندوق؛ آماده‌ی اعلام", "danger"],
     approved: ["تأیید شد", "success"],
     declined: ["رد شد", "danger"],
   },
@@ -142,7 +141,7 @@ export const ORG_ROLE_FA: Record<string, string> = { org_admin: "مدیر ساز
 export const STAFF_ROLE_FA: Record<string, string> = {
   super_admin: "مدیر سامانه", compliance_officer: "کارشناس انطباق", finance_officer: "کارشناس مالی", tokenisation_officer: "کارشناس توکن‌سازی",
   analyst: "کارشناس اعتباری", external_expert: "کارشناس بیرونی", technical_expert: "کارشناس فنی", committee_member: "عضو کمیته",
-  fund_manager: "مدیر صندوق", credit_manager: "مدیر اعتبارات", ceo: "مدیرعامل صندوق", auditor: "حسابرس",
+  fund_manager: "مدیر صندوق (مدیرعامل)", credit_manager: "مدیر اعتبارات", auditor: "حسابرس",
 };
 export const ACTIVITY_FA: Record<string, string> = {
   production_contracting: "تولیدی - پیمانکاری", production_line: "تولیدی - خط تولید", production_trading: "تولیدی - بازرگانی",

@@ -89,12 +89,13 @@ export async function acceptAll(t: TestApp, an: Session, caseId: string) {
 }
 
 /**
- * After the credit approval (fund rules 2026-11-26): the compliance officer sends the result to the CEO, the CEO confirms
- * the committee meeting and accepts (optionally editing the ceilings), the compliance officer releases it to the company.
+ * After the analyst sends the round (fund rules 2026-11-27): the compliance officer sends it to the fund manager (the
+ * fund's CEO), who confirms the committee meeting and accepts or declines (optionally editing the ceilings); the
+ * compliance officer releases the result to the company.
  */
-export async function finishChain(t: TestApp, caseId: string, co: Session, ceo: Session, opts: { overrides?: any; decision?: "accept" | "decline"; note?: string } = {}) {
-  await t.http.post(`${V}/admin/cases/${caseId}/to-ceo`).set(co.auth).send({ comment: "نتیجه‌ی کمیته‌ی اعتباری برای تصمیم مدیرعامل." }).expect(200);
+export async function finishChain(t: TestApp, caseId: string, co: Session, fm: Session, opts: { overrides?: any; decision?: "accept" | "decline"; note?: string } = {}) {
+  await t.http.post(`${V}/admin/cases/${caseId}/to-ceo`).set(co.auth).send({ comment: "نتیجه‌ی کمیته‌ی اعتباری برای تصمیم مدیر صندوق." }).expect(200);
   const body: any = { meeting_held: true, meeting_date: "2026-11-20", decision: opts.decision ?? "accept", comment: "جلسه‌ی کمیته برگزار شد؛ تأیید می‌شود.", ...(opts.overrides ? { overrides: opts.overrides } : {}) };
-  await t.http.post(`${V}/admin/cases/${caseId}/ceo-decision`).set(ceo.auth).set(await su(t, ceo, "POST", `/admin/cases/${caseId}/ceo-decision`, body, {})).send(body).expect(200);
+  await t.http.post(`${V}/admin/cases/${caseId}/ceo-decision`).set(fm.auth).set(await su(t, fm, "POST", `/admin/cases/${caseId}/ceo-decision`, body, {})).send(body).expect(200);
   return (await t.http.post(`${V}/admin/cases/${caseId}/release`).set(co.auth).send({ note_to_applicant: opts.note ?? "حد اعتباری با چک و سفته؛ برای افزایش، وثیقه‌ی ملکی پیشنهاد دهید." }).expect(200)).body;
 }
