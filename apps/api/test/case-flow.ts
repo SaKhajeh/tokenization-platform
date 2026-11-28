@@ -47,7 +47,7 @@ export async function su(t: TestApp, s: Session, method: string, path: string, b
 }
 
 /** Fills everything (form, figures, letter, documents). Pays the fee first if `payFee` is given. */
-export async function prepareCase(t: TestApp, a: Awaited<ReturnType<typeof approvedOrg>>, opts: { province?: string } = {}) {
+export async function prepareCase(t: TestApp, a: Awaited<ReturnType<typeof approvedOrg>>, opts: { province?: string; noTrialBalance?: boolean } = {}) {
   const prep = await addMember(t, a.admin, a.orgId, `0912444${String(Math.floor(Math.random() * 9000) + 1000)}`, "preparer");
   const o = a.org;
   let c = (await t.http.get(`${V}/case`).set(a.admin.auth).set(o).expect(200)).body;
@@ -58,7 +58,7 @@ export async function prepareCase(t: TestApp, a: Awaited<ReturnType<typeof appro
     await t.http.put(`${V}/case/financials/${y0 - i}`).set(prep.auth).set(o).send({ statement_type: "audited", figures: year(s) }).expect(200);
   }
   // the current-year trial balance (to the end of the last completed season): its own period, fiscal year latest + 1
-  await t.http.put(`${V}/case/financials/${y0 + 1}`).set(prep.auth).set(o).send({ statement_type: "trial_balance", figures: year(160000) }).expect(200);
+  if (!opts.noTrialBalance) await t.http.put(`${V}/case/financials/${y0 + 1}`).set(prep.auth).set(o).send({ statement_type: "trial_balance", figures: year(160000) }).expect(200);
   await t.http.put(`${V}/case/letter`).set(prep.auth).set(o).send({ text: "درخواست تأمین مالی حدود ۲۰ میلیارد ریال برای خرید تجهیزات خط تولید حسگر." }).expect(200);
   await t.http.post(`${V}/case/letter/sign`).set(a.admin.auth).set(await su(t, a.admin, "POST", "/case/letter/sign", {}, o)).send({}).expect(200);
   c = (await t.http.get(`${V}/case`).set(prep.auth).set(o).expect(200)).body;

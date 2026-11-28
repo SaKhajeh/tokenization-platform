@@ -432,7 +432,7 @@ Not drawn (follow the same patterns): the other 6 form sections, form-section re
 
 The fund's answer on how the four years are used:
 
-- The company provides **financial statements for the past 4 years** and a **six-column trial balance of the current year up to the end of the last completed season** (D-C34, built): in summer → to the end of spring; in the middle of fall → to the end of summer; in spring → the whole previous year. The period is shown with item 3-2 to the applicant and to staff.
+- The company provides **financial statements for the past 4 years** and a **six-column trial balance of the current year up to the end of the last completed season** (D-C34, built): in summer → to the end of spring; in the middle of fall → to the end of summer; in winter → to the end of fall; **in spring none** (D-C39). The period is shown with item 3-2 to the applicant and to staff.
 - The limit is calculated **twice** (D-C35, **not built yet**): (A) on the 4 years of statements; (B) on 3 years of statements plus the trial balance. If A ≥ B, A is the limit. If B > A, the analyst compares the trial balance with the tax returns and other documents and confirms it before B can be used.
 - This replaces the "balance sheet only" option for the latest year (D-C27), which was a stand-in for the trial balance.
 
@@ -446,4 +446,4 @@ The fund's answer on how the four years are used:
 
 | D-C38 (2026-11-27) | The fund manager **is** the CEO; there is **no separate credit approval** — the compliance officer takes the analyst's round to the fund manager | Chain: analyst sends → compliance officer sends to the fund manager with a comment, or back to the analyst → fund manager (meeting confirmed, ceilings editable, accept/decline, OTP) → compliance officer releases to the company. Round states: preparing → pending_approval (with compliance) → ceo_review → ceo_accepted / ceo_declined → approved / declined. The CEO role and the credit approval are removed (migration 015); the credit manager assigns cases. Nobody moves a round they prepared |
 
-Still to confirm: in spring the trial balance covers the whole previous year.
+| D-C39 (2026-11-27) | In spring (Farvardin–Khordad) no season of the new year is complete: **no trial balance is accepted**; only the statements of the last 4 years | In spring the trial-balance period and its document are not asked for and cannot be saved; submission does not need them; scoring runs calculation A only (B is shown as "not accepted in spring") |

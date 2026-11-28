@@ -139,12 +139,18 @@ describe("fund feedback 2026-11-25", () => {
   });
 });
 
-describe("trial balance period (fund feedback 2026-11-26)", () => {
+describe("trial balance period (fund feedback 2026-11-26, spring rule 2026-11-27)", () => {
+  it("is not asked for in spring", () => {
+    const ctx = { people: [], latestFiscalYear: 1404, locations: [], banks: [] };
+    expect(expectedSlots(ctx).some((x) => x.code === "3-2")).toBe(true);
+    expect(expectedSlots({ ...ctx, trialBalanceDue: false }).some((x) => x.code === "3-2")).toBe(false);
+  });
   // 2026-07-25 = 3 Mordad 1405 (summer) · 2026-11-25 = 4 Azar 1405 (fall) · 2026-04-10 = 21 Farvardin 1405 (spring) · 2027-03-01 = 10 Esfand 1405 (winter)
   it("covers the year to the end of the last completed season", () => {
     expect(trialBalancePeriod("2026-07-25")).toMatchObject({ fiscalYear: 1405, throughMonth: 3, label: "از ابتدای سال 1405 تا پایان خرداد 1405" });
     expect(trialBalancePeriod("2026-11-25")).toMatchObject({ fiscalYear: 1405, throughMonth: 6 });
     expect(trialBalancePeriod("2027-03-01")).toMatchObject({ fiscalYear: 1405, throughMonth: 9 });
-    expect(trialBalancePeriod("2026-04-10")).toMatchObject({ fiscalYear: 1404, throughMonth: 12 });
+    expect(trialBalancePeriod("2026-04-10")).toBeNull(); // spring: no trial balance is accepted
+    expect(trialBalancePeriod("2026-06-20")).toBeNull(); // 30 Khordad, still spring
   });
 });

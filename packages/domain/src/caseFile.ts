@@ -177,6 +177,8 @@ export interface SlotContext {
   latestFiscalYear: number;
   locations: readonly { id: string; usage?: string; address?: string }[];
   banks: readonly { id: string; name?: string; account_no?: string }[];
+  /** False in spring, when no trial balance is accepted (fund 2026-11-27): the trial-balance item is not asked for. */
+  trialBalanceDue?: boolean;
 }
 
 const isDirector = (p: CasePerson) => p.roles.includes("ceo") || p.roles.includes("board");
@@ -188,6 +190,7 @@ export function expectedSlots(ctx: SlotContext): SlotDef[] {
   const out: SlotDef[] = [];
   const directors = ctx.people.filter(isDirector);
   for (const c of CASE_CHECKLIST) {
+    if (c.code === TRIAL_BALANCE_ITEM && ctx.trialBalanceDue === false) continue;
     const add = (slotKey: string, label: string, required = c.required) => out.push({ code: c.code, slotKey, label, required, multi: c.multi });
     switch (c.slots) {
       case "single":
@@ -450,16 +453,23 @@ export function feeRegion(locations: readonly { usage?: string; province?: strin
 
 const JALALI_MONTH_FA = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
 
+/** The checklist item of the current-year trial balance. */
+export const TRIAL_BALANCE_ITEM = "3-2";
+
 /**
  * The period the current-year trial balance must cover: from the start of the Jalali year to the end of the last
  * completed season (Iran's year starts in spring). In summer → to the end of spring (Khordad); in the middle of fall
- * → to the end of summer (Shahrivar). In spring no season of the new year is complete yet, so it covers the whole
- * previous year (to the end of Esfand). `today` is a Tehran calendar date (YYYY-MM-DD).
+ * → to the end of summer (Shahrivar); in winter → to the end of fall (Azar). In spring (Farvardin–Khordad) no season
+ * of the new year is complete, so **no trial balance is accepted** (fund 2026-11-27) and this returns null: only the
+ * four years of statements are used. `today` is a Tehran calendar date (YYYY-MM-DD).
  */
-export function trialBalancePeriod(today: string): { fiscalYear: number; throughMonth: 3 | 6 | 9 | 12; months: number; label: string } {
+export function trialBalancePeriod(today: string): { fiscalYear: number; throughMonth: 3 | 6 | 9; months: number; label: string } | null {
   const [jy, jm] = isoToJalali(today).split("/").map(Number);
   const done = Math.floor((jm - 1) / 3) * 3; // months of this year in completed seasons: 0, 3, 6 or 9
-  const fiscalYear = done === 0 ? jy - 1 : jy;
-  const throughMonth = (done === 0 ? 12 : done) as 3 | 6 | 9 | 12;
-  return { fiscalYear, throughMonth, months: throughMonth, label: `از ابتدای سال ${fiscalYear} تا پایان ${JALALI_MONTH_FA[throughMonth - 1]} ${fiscalYear}` };
+  if (done === 0) return null;
+  const throughMonth = done as 3 | 6 | 9;
+  return { fiscalYear: jy, throughMonth, months: throughMonth, label: `از ابتدای سال ${jy} تا پایان ${JALALI_MONTH_FA[throughMonth - 1]} ${jy}` };
 }
+
+/** Shown instead of the period in spring. */
+export const SPRING_NO_TRIAL_BALANCE_FA = "در بهار (فروردین تا خرداد) هنوز فصلی از سال جاری کامل نشده است؛ تراز آزمایشی پذیرفته نمی‌شود و فقط صورت‌های مالی چهار سال اخیر لازم است.";

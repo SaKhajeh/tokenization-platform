@@ -112,8 +112,8 @@ export default function CasePage() {
                 <Progress value={itemsDone} max={items.length} label="پیشرفت مدارک" />
                 <div style={{ marginTop: 12 }}><Link href="/case/documents"><Button variant="secondary" block>بارگذاری و مدیریت مدارک</Button></Link></div>
               </Card>
-              <Card title="خلاصه‌ی صورت‌های مالی" action={<span className="t-small t-muted">{fa(finDone)} از {fa(FINANCIAL_YEARS + 1)} دوره</span>}>
-                <Progress value={finDone} max={FINANCIAL_YEARS + 1} label="پیشرفت صورت‌های مالی" />
+              <Card title="خلاصه‌ی صورت‌های مالی" action={<span className="t-small t-muted">{fa(finDone)} از {fa(c.financials.length)} دوره</span>}>
+                <Progress value={finDone} max={c.financials.length} label="پیشرفت صورت‌های مالی" />
                 <div style={{ marginTop: 12 }}><Link href="/case/financials"><Button variant="secondary" block>ورود ارقام تراز آزمایشی و چهار سال اخیر</Button></Link></div>
               </Card>
             </div>

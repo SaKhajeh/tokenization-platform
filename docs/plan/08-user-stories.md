@@ -82,11 +82,11 @@ flowchart TD
 **Credit case**
 - When I submit KYB with the financing purpose, my credit case opens by itself, pre-filled from KYB; the articles and gazette I uploaded at KYB already count. At the start I am told that credit assessment and the credit limit do not mean the fund will grant financing or services.
 - I fill in the 9 form sections and see, while typing, what is missing in each.
-- I enter the **current-year trial balance** (to the end of the last completed season, shown) and **four years** of statements, in million rials, with automatic totals and a balance check. The fund calculates the limit twice: on the four years of statements, and on the trial balance plus the three latest years.
+- I enter the **current-year trial balance** (to the end of the last completed season, shown; **not in spring**, when only the four years are needed) and **four years** of statements, in million rials, with automatic totals and a balance check. The fund calculates the limit twice: on the four years of statements, and on the trial balance plus the three latest years.
 - I upload documents into a checklist with one slot per person, year, location or bank account:
   - **financial statements** and **tax returns** for each of the four years — for a year without a tax return I upload a letter and choose the reason (newly established, inactive, exempt, other);
   - **ID papers**: every page of the birth certificate and both sides of the national card, as several files;
-  - **six-column trial balance of the current year up to the end of the last completed season** (the period is shown), at the general, subsidiary and detail levels (one file per level);
+  - **six-column trial balance of the current year up to the end of the last completed season** (the period is shown; not asked for in spring), at the general, subsidiary and detail levels (one file per level);
   - **insurance list** (no payment receipt);
   - **first pages of important contracts or sales invoices**, as many files as needed;
   - **product catalogue** (required);

@@ -1,3 +1,4 @@
+import { IllegalTransitionError } from "@tp/domain";
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException } from "@nestjs/common";
 import { ZodError } from "zod";
 
@@ -45,6 +46,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
     } else if (err instanceof HttpException) {
       status = err.getStatus();
       body = { code: status === 404 ? "NOT_FOUND" : "HTTP_ERROR", message: err.message, message_fa: "درخواست قابل انجام نیست." };
+    } else if (err instanceof IllegalTransitionError) {
+      // An action not allowed in the current state (e.g. reviewing a case that was not submitted): a clear 409, not a 500.
+      status = 409;
+      body = { code: "WRONG_STATE", message: err.message, message_fa: "این کار در وضعیت فعلی ممکن نیست." };
     } else if (isPgError(err) && err.code === "23505") {
       status = 409;
       body = { code: "CONFLICT", message: "Duplicate value", message_fa: "این مورد قبلاً ثبت شده است.", details: { constraint: err.constraint } };

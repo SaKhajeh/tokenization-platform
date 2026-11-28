@@ -2,6 +2,8 @@
 
 _Version 1.0 draft · 2026-11-04 · Companion to plan/02-prd-v1.md (FR IDs referenced) · All PRD §16 assumptions confirmed as v1 defaults._
 
+_Updated 2026-11-27 (spring rule, D-C39): in spring the case lists no trial-balance period, `PUT case/financials/{latest+1}` answers 422 `TRIAL_BALANCE_NOT_ACCEPTED`, item 3-2 is not expected, and scoring has `alternatives.b = null` with `b_error: ["spring: no trial balance is accepted"]`. Errors: an illegal state change answers 409 `WRONG_STATE`. Development/test: `TP_TODAY=YYYY-MM-DD` overrides today's date for these rules (ignored in staging and production)._
+
 _Updated 2026-11-27 (migration 015): role `ceo` removed (its holders become `fund_manager`); round state `credit_approved` removed; `POST admin/cases/:id/decision` removed; `POST admin/cases/:id/to-ceo` and new `POST admin/cases/:id/send-back` (compliance officer, from `pending_approval`); `POST admin/cases/:id/ceo-decision` is the fund manager's._
 
 _Updated 2026-11-26 (migration 014): `case_financials.statement_type` adds `trial_balance` (fiscal year = latest + 1) and `through_month`; staff role `ceo`; `assessment_rounds` adds compliance_*, committee_meeting_on, ceo_decision / ceo_comment / ceo_overrides / ceo_by / ceo_at, released_by / released_at; round states credit_approved, ceo_review, ceo_accepted, ceo_declined. Endpoints: `POST admin/cases/:id/to-ceo` (compliance), `POST admin/cases/:id/ceo-decision` (ceo, step-up), `POST admin/cases/:id/release` (compliance; issues the limit); `POST admin/cases/:id/scoring` takes `trial_balance_check`; round outputs carry both calculations (`alternatives.a|b`, `chosen`, per-period tables); `POST admin/cases/:id/decision` approve → credit_approved (no longer issues the limit)._

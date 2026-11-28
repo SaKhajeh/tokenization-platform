@@ -12,7 +12,7 @@
  *                 ceilings for the report. The norm usage ledger draws it down (amount ÷ (Ra × Re)).
  */
 import { Inject, Injectable } from "@nestjs/common";
-import { ActivityType, addJalaliMonths, DEFAULT_SCORING_METHOD, invoiceTotals, jalaliYearOf, LIMIT_VALIDITY_MONTHS, ROUND, RoundState, scoreCase, ScoringMethod, ScoringInputError, toFinancialYear, toRials, transition, usageLedger, validateScoringMethod, VISIT, VisitState, checklistItem, COLLATERAL_CLASSES, isoFromUtcDate, scoringYears, SCORING_METHOD_V2_CHANGES, calculationPeriods } from "@tp/domain";
+import { ActivityType, addJalaliMonths, DEFAULT_SCORING_METHOD, invoiceTotals, jalaliYearOf, LIMIT_VALIDITY_MONTHS, ROUND, RoundState, scoreCase, ScoringMethod, ScoringInputError, toFinancialYear, toRials, transition, usageLedger, validateScoringMethod, VISIT, VisitState, checklistItem, COLLATERAL_CLASSES, isoFromUtcDate, scoringYears, SCORING_METHOD_V2_CHANGES, calculationPeriods, trialBalancePeriod } from "@tp/domain";
 import { DB, type Db, type Queryable } from "../db/db.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ApiError, Errors } from "../common/errors.js";
@@ -280,6 +280,8 @@ export class LimitsService {
     }
     let b: any = null, bError: string[] | null = null;
     try {
+      // in spring no trial balance is accepted: only calculation A (fund 2026-11-27)
+      if (!trialBalancePeriod(tehranToday())) throw new ScoringInputError(["spring: no trial balance is accepted"]);
       if (!row(c.latest_fiscal_year + 1)?.verified) throw new ScoringInputError(["trial balance missing"]);
       b = run(periods.b);
     } catch (e) {

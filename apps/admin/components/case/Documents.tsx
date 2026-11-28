@@ -60,7 +60,7 @@ export function Documents({ c, reload, canReview, canOriginal }: { c: StaffCase;
       </div>
       <div className="stack">
         {current && (
-          <Card title={<div className="stack-sm"><h2 className="t-h3">{current.title} — {current.label}</h2>{current.guidance && <span className="t-small t-muted">{current.guidance}</span>}{current.code === "3-2" && <span className="t-small">دوره‌ی مورد انتظار: {fa(trialBalancePeriod(new Date(Date.now() + 3.5 * 3600_000).toISOString().slice(0, 10)).label)}</span>}</div>}
+          <Card title={<div className="stack-sm"><h2 className="t-h3">{current.title} — {current.label}</h2>{current.guidance && <span className="t-small t-muted">{current.guidance}</span>}{current.code === "3-2" && (() => { const tb = trialBalancePeriod(new Date(Date.now() + 3.5 * 3600_000).toISOString().slice(0, 10)); return tb ? <span className="t-small">دوره‌ی مورد انتظار: {fa(tb.label)}</span> : null; })()}</div>}
             action={<div className="row">{current.original_required && <Chip tone="info">اصل در بازدید</Chip>}{current.from_kyb && <Chip>از احراز هویت</Chip>}</div>}>
             <div className="stack">
               {current.files.filter((f) => !f.removed_at).map((f) => (

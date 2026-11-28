@@ -20,7 +20,16 @@ import { PricingService } from "../pricing/pricing.service.js";
 import { formatMoney } from "@tp/domain";
 
 /** Today's date in Tehran (UTC+03:30), as an ISO date. */
-export const tehranToday = () => isoFromUtcDate(new Date(Date.now() + 3.5 * 3600_000));
+/**
+ * Today's date in Tehran (YYYY-MM-DD). Outside staging and production, TP_TODAY=YYYY-MM-DD overrides it for the
+ * calendar rules (e.g. to try the spring rule for the trial balance); it never applies in staging or production.
+ */
+export const tehranToday = () => {
+  const env = process.env.APP_ENV ?? "development";
+  const fake = process.env.TP_TODAY;
+  if (fake && env !== "production" && env !== "staging" && /^\d{4}-\d{2}-\d{2}$/.test(fake)) return fake;
+  return isoFromUtcDate(new Date(Date.now() + 3.5 * 3600_000));
+};
 
 export const INVESTMENT_TYPES = ["project_finance", "working_capital", "equipment", "research_commercialisation"] as const;
 

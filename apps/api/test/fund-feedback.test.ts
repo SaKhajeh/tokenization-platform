@@ -177,4 +177,39 @@ describe("fund feedback 2026-11-25", () => {
     expect(after.state).toBe("uploaded");
     expect(after.files[0].alt_reason).toBe("newly_established");
   });
+
+  it("in spring no trial balance is accepted: only the four years of statements, calculation A alone", async () => {
+    process.env.TP_TODAY = "2027-04-20"; // 31 Farvardin 1406
+    try {
+      const a = await approvedOrg(t, 409, { compliance: co, financing: true, extraPeople: [{ nationalCode: BOARD_NC, name: "رضا کریمی", roles: ["board"] }] });
+      const c0 = (await t.http.get(`${V}/case`).set(a.admin.auth).set(a.org).expect(200)).body;
+      const y0 = c0.latest_fiscal_year;
+      expect(y0).toBe(1405);
+      expect(c0.financials.map((f: any) => f.fiscal_year)).toEqual([1405, 1404, 1403, 1402]); // no trial-balance period
+      expect(c0.items.some((i: any) => i.code === "3-2")).toBe(false);                      // nor its document
+      expect((await t.http.put(`${V}/case/financials/${y0 + 1}`).set(a.admin.auth).set(a.org).send({ statement_type: "trial_balance", figures: year(160000) })).body.error.code).toBe("TRIAL_BALANCE_NOT_ACCEPTED");
+      const { caseId } = await prepareCase(t, a, { noTrialBalance: true });
+      const c1 = (await t.http.get(`${V}/case`).set(a.admin.auth).set(a.org).expect(200)).body;
+      expect(c1.blockers.filter((b: any) => b.code === "financials_incomplete")).toEqual([]);
+      // a review cannot start before the case is submitted: a clear 409, not a server error
+      expect((await t.http.post(`${V}/admin/cases/${caseId}/start-review`).set(an.auth)).body.error.code).toBe("WRONG_STATE");
+      // (a fee tariff exists from an earlier test: exempt this company so the fee does not block submission)
+      const ex = { charge_point: "case_submission", reason: "بدون کارمزد در آزمون فصل بهار" };
+      await t.http.post(`${V}/admin/orgs/${a.orgId}/fee-exemptions`).set(fm.auth).set(await su(t, fm, "POST", `/admin/orgs/${a.orgId}/fee-exemptions`, ex, {})).send(ex).expect(201);
+      expect((await submitCase(t, a)).status).toBe(200);
+      await acceptAll(t, an, caseId);
+      await t.http.post(`${V}/admin/cases/${caseId}/financials/lock`).set(an.auth).expect(200);
+      await t.http.post(`${V}/admin/cases/${caseId}/visit`).set(an.auth).send({ visit_date: "2027-04-21", visit_time: "10:00", visitor_id: tech.userId }).expect(201);
+      await t.http.post(`${V}/case/visit/confirm`).set(a.admin.auth).set(a.org).expect(200);
+      await t.http.post(`${V}/admin/cases/${caseId}/visit/report`).set(tech.auth).send({ findings: "خط تولید فعال." }).expect(200);
+      const fc = (await t.http.get(`${V}/admin/cases/${caseId}`).set(an.auth).expect(200)).body;
+      for (const i of fc.items.filter((x: any) => x.original_required && x.state === "accepted")) await t.http.post(`${V}/admin/cases/${caseId}/items/${i.id}/original-received`).set(tech.auth).expect(200);
+      const r = (await t.http.post(`${V}/admin/cases/${caseId}/scoring`).set(an.auth).send(scoreBody).expect(200)).body.result;
+      expect(r.chosen).toBe("a");
+      expect(r.alternatives.b).toBeNull();
+      expect(r.alternatives.b_error).toEqual(["spring: no trial balance is accepted"]);
+    } finally {
+      delete process.env.TP_TODAY;
+    }
+  });
 });

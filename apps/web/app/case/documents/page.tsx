@@ -48,7 +48,7 @@ export default function DocumentsPage() {
           const first = list[0];
           return (
             <Card key={key} title={<div className="stack-sm"><h2 className="t-h3">{first.title}</h2>{first.guidance && <span className="t-small t-muted">{first.guidance}</span>}
-              {first.code === "3-2" && <span className="t-small" style={{ color: "var(--info-700)" }}>دوره‌ی تراز آزمایشی: {fa(trialBalancePeriod(new Date(Date.now() + 3.5 * 3600_000).toISOString().slice(0, 10)).label)}</span>}
+              {first.code === "3-2" && (() => { const tb = trialBalancePeriod(new Date(Date.now() + 3.5 * 3600_000).toISOString().slice(0, 10)); return tb ? <span className="t-small" style={{ color: "var(--info-700)" }}>دوره‌ی تراز آزمایشی: {fa(tb.label)}</span> : null; })()}
               {(() => { const tpl = templates.data?.find((x) => x.code === first.code); return tpl ? <a className="t-small" href={tpl.url} target="_blank" rel="noreferrer">دانلود قالب صندوق ({tpl.filename})</a> : null; })()}
               {checklistItem(first.code)?.howTo && (
                 <details className="t-small"><summary style={{ cursor: "pointer", color: "var(--primary-700)" }}>راهنمای دریافت گزارش از اعتباریتو</summary>

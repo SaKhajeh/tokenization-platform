@@ -49,8 +49,12 @@ const err = {
 
 const KEY_IDENTITY = ["legal_name", "legal_form"] as const;
 const editable = (s: CaseState) => (CASE_EDITABLE as readonly string[]).includes(s);
-/** Periods entered: the current-year trial balance (latest + 1), then four years of statements (fund rules 2026-11-26). */
-const yearsOf = (y0: number) => financialPeriods(y0);
+/**
+ * Periods entered: the current-year trial balance (latest + 1), then four years of statements (fund rules 2026-11-26).
+ * In spring no trial balance is accepted, so only the four years (fund 2026-11-27).
+ */
+const trialBalanceDue = () => trialBalancePeriod(tehranToday()) !== null;
+const yearsOf = (y0: number) => (trialBalanceDue() ? financialPeriods(y0) : financialYears(y0));
 
 @Injectable()
 export class CasesService {
@@ -232,6 +236,7 @@ export class CasesService {
     const c = (await q.query(`select latest_fiscal_year from cases where id = $1`, [caseId])).rows[0];
     const secs = await this.sections(q, caseId);
     const expected = expectedSlots({
+      trialBalanceDue: trialBalanceDue(),
       people: casePeople(secs.board?.data),
       latestFiscalYear: c.latest_fiscal_year,
       locations: ((secs.locations?.data?.rows ?? []) as any[]).filter((r) => r.id),
@@ -422,12 +427,13 @@ export class CasesService {
     return this.db.tx(async (q) => {
       const c = await this.caseOf(q, req.org!.id, true);
       if (!["opened", "in_preparation", "under_review"].includes(c.state)) throw err.locked(c.state);
+      if (year === c.latest_fiscal_year + 1 && !trialBalanceDue()) throw new ApiError(422, "TRIAL_BALANCE_NOT_ACCEPTED", "No trial balance is accepted in spring", "در بهار تراز آزمایشی پذیرفته نمی‌شود؛ فقط صورت‌های مالی چهار سال اخیر لازم است.");
       if (!yearsOf(c.latest_fiscal_year).includes(year)) throw err.year();
       // the current-year period is the trial balance (to the end of the last completed season); the others are statements
       const isTb = year === c.latest_fiscal_year + 1;
       if (isTb !== (input.statement_type === "trial_balance")) throw new ApiError(422, "TRIAL_BALANCE_PERIOD", "The current-year period is the trial balance; earlier years are statements", "دوره‌ی سال جاری، تراز آزمایشی است و سال‌های قبل، صورت مالی.");
       if (input.statement_type === "balance_sheet") throw err.balanceSheetYear();
-      const throughMonth = isTb ? trialBalancePeriod(tehranToday()).throughMonth : null;
+      const throughMonth = isTb ? trialBalancePeriod(tehranToday())!.throughMonth : null;
       const bad = Object.entries(input.figures).filter(([k, v]) => !(FINANCIAL_FIELDS as readonly string[]).includes(k) || !/^-?(0|[1-9]\d{0,14})$/.test(v)).map(([k]) => k);
       if (bad.length) throw err.figures(bad);
       await q.query(

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FINANCIAL_FIELDS, statement } from "@tp/domain/creditScoring";
-import { financialPeriods, toFinancialYear, trialBalancePeriod } from "@tp/domain/caseFile";
+import { SPRING_NO_TRIAL_BALANCE_FA, toFinancialYear, trialBalancePeriod } from "@tp/domain/caseFile";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, Card, FIN_GROUPS, FIN_TOTALS, STATEMENT_TYPE_FA, Tabs, Toast, fa, latin, millions } from "@tp/ui";
 import { Shell } from "@/components/Shell";
@@ -19,7 +19,8 @@ export default function FinancialsPage() {
   const { org } = useMe();
   const cs = useQuery(org ? `case:${org.id}` : null, () => api.get<Case>("/case"));
   const c = cs.data;
-  const years = c ? financialPeriods(c.latest_fiscal_year) : [];
+  // the server lists the periods: the trial balance first (except in spring, when none is accepted), then four years
+  const years = c ? c.financials.map((f) => f.fiscal_year) : [];
   const tbYear = c ? c.latest_fiscal_year + 1 : 0;
   const tb = trialBalancePeriod(new Date(Date.now() + 3.5 * 3600_000).toISOString().slice(0, 10));
   const head = (y: number) => (y === tbYear ? "تراز آزمایشی" : `سال ${fa(y)}`);
@@ -31,7 +32,7 @@ export default function FinancialsPage() {
   useEffect(() => {
     if (!c) return;
     const v: Record<number, Year> = {};
-    for (const y of financialPeriods(c.latest_fiscal_year)) {
+    for (const y of c.financials.map((f) => f.fiscal_year)) {
       const row = c.financials.find((f) => f.fiscal_year === y);
       v[y] = row?.declared ? { statement_type: row.statement_type ?? "", figures: { ...empty().figures, ...row.declared } } : empty();
     }
@@ -65,7 +66,9 @@ export default function FinancialsPage() {
       <div className="stack">
         <Link href="/case">← بازگشت به پرونده</Link>
         <p className="t-muted">ارقام <strong>چهار سال اخیر</strong> را به <strong>میلیون ریال</strong> و بدون اعشار، مطابق صورت مالی حسابرسی‌شده یا اظهارنامه وارد کنید. زیان را با علامت منفی بنویسید.</p>
-        <p className="t-small t-muted">ستون اول، ارقام تراز آزمایشی سال جاری ({fa(tb.label)}) است؛ ارقام همان دوره را بدون تبدیل به سالانه وارد کنید. صندوق حد را یک بار با چهار سال صورت مالی و یک بار با تراز آزمایشی و سه سال اخیر محاسبه می‌کند.</p>
+        {tb && years.includes(tbYear) ? (
+          <p className="t-small t-muted">ستون اول، ارقام تراز آزمایشی سال جاری ({fa(tb.label)}) است؛ ارقام همان دوره را بدون تبدیل به سالانه وارد کنید. صندوق حد را یک بار با چهار سال صورت مالی و یک بار با تراز آزمایشی و سه سال اخیر محاسبه می‌کند.</p>
+        ) : <p className="t-small t-muted">{SPRING_NO_TRIAL_BALANCE_FA}</p>}
         <ErrorBanner error={cs.error} />
         {c && (
           <Card>
@@ -75,7 +78,7 @@ export default function FinancialsPage() {
             <div className="table-wrap">
               <table className="table fin-table">
                 <thead>
-                  <tr><th>قلم</th>{years.map((y, i) => <th key={y} className={i !== yi ? "yr-other" : undefined}>{head(y)}{y === tbYear && <div className="t-small t-muted" style={{ fontWeight: 400 }}>{fa(tb.label)}</div>}</th>)}</tr>
+                  <tr><th>قلم</th>{years.map((y, i) => <th key={y} className={i !== yi ? "yr-other" : undefined}>{head(y)}{y === tbYear && tb && <div className="t-small t-muted" style={{ fontWeight: 400 }}>{fa(tb.label)}</div>}</th>)}</tr>
                   <tr><td>نوع صورت مالی</td>{years.map((y, i) => (
                     <td key={y} className={i !== yi ? "yr-other" : undefined}>
                       {y === tbYear ? <span className="t-small">تراز آزمایشی شش‌ستونی</span> : <select className="select" value={vals[y]?.statement_type ?? ""} disabled={!editable} aria-label={`نوع صورت مالی ${y}`}
