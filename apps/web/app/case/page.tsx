@@ -54,7 +54,7 @@ export default function CasePage() {
   const items = c?.items.filter((i) => i.state !== "not_required") ?? [];
   const itemsDone = items.filter((i) => !["empty", "requested", "needs_fix", "rejected"].includes(i.state)).length;
   const secDone = c?.sections.filter((s) => s.state !== "empty" && !s.problems.length).length ?? 0;
-  const finDone = c?.financials.filter((f) => f.declared && !f.problems.length && f.statement_type).length ?? 0;
+  const finDone = c?.financials.filter((f) => f.declared && !f.problems.length && f.statement_type).length ?? 0; // trial balance + four years
   const feeBlocker = c?.blockers.find((b) => b.code === "assessment_fee_unpaid");
   const sectionTitle = (s: string) => SECTIONS[s]?.title ?? s;
 
@@ -112,9 +112,9 @@ export default function CasePage() {
                 <Progress value={itemsDone} max={items.length} label="پیشرفت مدارک" />
                 <div style={{ marginTop: 12 }}><Link href="/case/documents"><Button variant="secondary" block>بارگذاری و مدیریت مدارک</Button></Link></div>
               </Card>
-              <Card title="خلاصه‌ی صورت‌های مالی" action={<span className="t-small t-muted">{fa(finDone)} از {fa(FINANCIAL_YEARS)} سال</span>}>
-                <Progress value={finDone} max={FINANCIAL_YEARS} label="پیشرفت صورت‌های مالی" />
-                <div style={{ marginTop: 12 }}><Link href="/case/financials"><Button variant="secondary" block>ورود ارقام چهار سال اخیر</Button></Link></div>
+              <Card title="خلاصه‌ی صورت‌های مالی" action={<span className="t-small t-muted">{fa(finDone)} از {fa(FINANCIAL_YEARS + 1)} دوره</span>}>
+                <Progress value={finDone} max={FINANCIAL_YEARS + 1} label="پیشرفت صورت‌های مالی" />
+                <div style={{ marginTop: 12 }}><Link href="/case/financials"><Button variant="secondary" block>ورود ارقام تراز آزمایشی و چهار سال اخیر</Button></Link></div>
               </Card>
             </div>
           </div>

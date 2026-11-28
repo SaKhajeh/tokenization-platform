@@ -1,6 +1,6 @@
 # User stories — what the platform supports today
 
-_Version 1 · 2026-11-25 · Based on the code on `main` (master plan v0.25). Stories marked **(API only)** work in the
+_Version 2 · 2026-11-26 · Based on the code on `main` (master plan v0.26). Stories marked **(API only)** work in the
 backend but have no screen yet. Update this document together with the code (01 §7)._
 
 Three groups use the platform: **companies that invest**, **companies that want financing (applicants)**, and **fund
@@ -65,22 +65,25 @@ flowchart TD
   end
   subgraph Fund staff
     S1[Review every item<br/>accept / fix / reject] --> S2[Verify and lock figures, visit]
-    S2 --> S3[Analyst scores — live preview]
-    S3 --> S4[Credit manager or fund manager approves — OTP]
+    S2 --> S3[Analyst: calculation A and B<br/>B only if higher and checked]
+    S3 --> S4[Credit approval: credit manager or fund manager — OTP]
+    S4 --> S6[Compliance officer → CEO with a comment]
+    S6 --> S7[CEO: committee meeting held, edit ceilings, accept or decline — OTP]
+    S7 --> S8[Compliance officer releases to the company with explanations]
     S5[Fund manager may adjust the limit later]
   end
   A3 --> S1
   S1 -. sent back .-> A2
   S2 --> A4
   S4 -. sent back .-> S3
-  S4 --> A5
+  S8 --> A5
   A5 -.-> S5
 ```
 
 **Credit case**
 - When I submit KYB with the financing purpose, my credit case opens by itself, pre-filled from KYB; the articles and gazette I uploaded at KYB already count. At the start I am told that credit assessment and the credit limit do not mean the fund will grant financing or services.
 - I fill in the 9 form sections and see, while typing, what is missing in each.
-- I enter **four years** of figures in million rials, with automatic totals and a balance check. If the latest year's statements are not ready, I mark it "balance sheet only"; the limit is then calculated from the three years before it.
+- I enter the **current-year trial balance** (to the end of the last completed season, shown) and **four years** of statements, in million rials, with automatic totals and a balance check. The fund calculates the limit twice: on the four years of statements, and on the trial balance plus the three latest years.
 - I upload documents into a checklist with one slot per person, year, location or bank account:
   - **financial statements** and **tax returns** for each of the four years — for a year without a tax return I upload a letter and choose the reason (newly established, inactive, exempt, other);
   - **ID papers**: every page of the birth certificate and both sides of the national card, as several files;
@@ -95,7 +98,7 @@ flowchart TD
 - If the fund sends items back, I see its note on each, fix only those and resubmit; extra documents the fund asks for appear in my checklist.
 - I reply to the fund's comments on any item. **(API only)**
 - I confirm the proposed visit date or ask for another (a ticket). The proposal tells me that two assessors and one specialist from the fund will come and that the CEO, with one technical or financial staff member, must be present.
-- I see my credit limit (and the collateral it is based on), validity, usage, ceilings with other collateral and the fund's note — never the scoring coefficients. If the fund adjusts it, I am notified and see the new limit.
+- Until the fund decides, my case shows "awaiting the fund's decision". Then I see my credit limit (and the collateral it is based on), validity, usage, ceilings with other collateral and the compliance officer's explanation of the numbers — never the scoring coefficients — or a decline with the explanation. If the fund adjusts the limit later, I am notified. With the limit, I can go on to request the fund's services (to be defined).
 
 **Financing applications**
 
@@ -118,13 +121,17 @@ flowchart TD
 
 **Compliance officer** — KYB queue (registry next to the declaration, risk warnings, the introduction letter; approve, reject, ask for information); bank accounts that did not match; held deposits: credit to the right company or refund **(API only)**.
 
-**Analyst** — takes a case; reviews each document in a viewer (every open is logged) and each form section; asks for extra documents; returns the case or declares documents complete; corrects figures with a reason and locks them; records credit-bureau and Sana inquiries **(API only)**; proposes the visit and the visitor; scores with Rc, Ra, Re and reasons while watching the live limit; sends the round with a summary; records guarantees the company already holds **(API only)**; screens applications and runs the limit check; leaves internal notes **(API only)**.
+**Analyst** — takes a case; reviews each document in a viewer (every open is logged) and each form section; asks for extra documents; returns the case or declares documents complete; corrects figures with a reason and locks them; records credit-bureau and Sana inquiries **(API only)**; proposes the visit and the visitor; scores with Rc, Ra, Re and reasons while watching both calculations live (A: four years of statements; B: trial balance + three years); if B is higher, checks the trial balance against the tax returns and other documents before B can be used; sends the round with a summary; records guarantees the company already holds **(API only)**; screens applications and runs the limit check; leaves internal notes **(API only)**.
 
-**Credit manager (مدیر اعتبارات)** — everything an analyst does, plus: divides cases between analysts (the queue shows who owns each case, and each analyst has "my cases"); approves or sends back or declines credit-limit rounds with OTP — never one they prepared.
+**Credit manager (مدیر اعتبارات)** — everything an analyst does, plus: divides cases between analysts (the queue shows who owns each case, and each analyst has "my cases"); gives the credit approval of a round (or sends it back or declines it) with OTP — never one they prepared. The approval goes to the compliance officer; it does not issue the limit.
+
+**Compliance officer (credit case)** — sends the credit-approved result to the CEO with a comment; after the CEO's decision, releases it to the company with an explanation of the numbers (this issues the limit, or tells the company it was declined).
+
+**CEO (مدیرعامل صندوق)** — confirms the committee meeting on the limit was held and enters its date; sees both calculations, each period separately (the trial balance marked as not annualised), and the guarantee and facility ceilings for each collateral; may edit those numbers; accepts or declines with a comment, with OTP.
 
 **Technical expert** — files the visit report and records originals received.
 
-**Fund manager** — approves limits as well (never their own round); **adjusts an issued limit** up or down by changing Rc/Ra/Re or the collateral class, with a live preview, a reason and OTP (the old limit is kept in history; the company is notified); **exempts a company from a fee in advance** (assessment or application fee, OTP; unpaid invoices are waived), or waives single invoices; publishes fee tariff versions (a fee can also be set to zero for everyone); uploads templates for checklist items (currently the credit-inquiry form only); approves large withdrawals (10 billion rials and above); edits the scoring method and rate policy **(API only)**.
+**Fund manager** — gives the credit approval as well (never their own round); **adjusts an issued limit** up or down by changing Rc/Ra/Re or the collateral class, with a live preview, a reason and OTP (the old limit is kept in history; the company is notified); **exempts a company from a fee in advance** (assessment or application fee, OTP; unpaid invoices are waived), or waives single invoices; publishes fee tariff versions (a fee can also be set to zero for everyone); uploads templates for checklist items (currently the credit-inquiry form only); approves large withdrawals (10 billion rials and above); edits the scoring method and rate policy **(API only)**.
 
 **Finance officer** — takes withdrawals into the finance queue or rejects them, sends them through Jibit Cobank with OTP; sees invoices; trial balance **(API only)**.
 

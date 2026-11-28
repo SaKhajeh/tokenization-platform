@@ -180,7 +180,7 @@ export class CasesController {
   }
 
   @Get("admin/scoring-method")
-  @StaffOnly("fund_manager", "analyst", "auditor", "super_admin")
+  @StaffOnly("compliance_officer", "ceo", "fund_manager", "analyst", "auditor", "super_admin")
   method() {
     return this.limits.method();
   }
@@ -228,7 +228,7 @@ export class CasesController {
   }
 
   @Get("admin/checklist-templates")
-  @StaffOnly("analyst", "fund_manager", "compliance_officer", "super_admin")
+  @StaffOnly("ceo", "analyst", "fund_manager", "compliance_officer", "super_admin")
   adminTemplates() {
     return this.tools.templates();
   }
@@ -321,33 +321,33 @@ export class CasesController {
 
   /** Staff directory for pickers (visit visitor, note recipients): active staff with a role, optionally one role. */
   @Get("admin/staff")
-  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "finance_officer", "super_admin")
+  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "finance_officer", "super_admin")
   staffList(@Query() query: unknown) {
     return this.comments.staffDirectory(parse(z.object({ role: z.string().max(40).optional() }), query).role);
   }
   /** «یادداشت‌های داخلی برای شما». */
   @Get("admin/notes")
-  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "super_admin")
+  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "super_admin")
   notes(@Req() req: AppRequest) {
     return this.comments.myNotes(req);
   }
 
   /** §6a: open a case file in the viewer, or download it — both logged. */
   @Get("admin/cases/:id/files/:fileId/:action")
-  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor")
+  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor")
   openFile(@Req() req: AppRequest, @Param() p: unknown) {
     const { id, fileId, action } = parse(z.object({ id: zUuid, fileId: zUuid, action: z.enum(["view", "download"]) }), p);
     return this.cases.openFile(req, id, fileId, action);
   }
 
   @Get("admin/cases")
-  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   list(@Query() query: unknown) {
     return this.cases.list(parse(z.object({ state: z.string().max(40).optional() }), query).state);
   }
 
   @Get("admin/cases/:id")
-  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   get(@Param() p: unknown) {
     return this.cases.get(parse(zId, p).id);
   }
@@ -425,13 +425,13 @@ export class CasesController {
 
   /** The fund's report (S-18/S-19): pre-filled from the case, with inquiries, red flags, ratios and the analysis sheet. */
   @Get("admin/cases/:id/report")
-  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   caseReport(@Param() p: unknown) {
     return this.report.report(parse(zId, p).id);
   }
 
   @Get("admin/cases/:id/visit")
-  @StaffOnly("analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
+  @StaffOnly("ceo", "analyst", "technical_expert", "fund_manager", "compliance_officer", "auditor", "super_admin")
   staffVisit(@Param() p: unknown) {
     return this.limits.staffVisit(parse(zId, p).id);
   }
@@ -478,7 +478,7 @@ export class CasesController {
   }
 
   @Get("admin/cases/:id/rounds")
-  @StaffOnly("analyst", "fund_manager", "auditor", "super_admin")
+  @StaffOnly("compliance_officer", "ceo", "analyst", "fund_manager", "auditor", "super_admin")
   rounds(@Param() p: unknown) {
     return this.limits.rounds(parse(zId, p).id);
   }
@@ -495,7 +495,7 @@ export class CasesController {
   }
 
   @Get("admin/orgs/:id/credit-limit")
-  @StaffOnly("analyst", "fund_manager", "finance_officer", "auditor", "super_admin")
+  @StaffOnly("compliance_officer", "ceo", "analyst", "fund_manager", "finance_officer", "auditor", "super_admin")
   staffLimit(@Param() p: unknown) {
     return this.limits.staffLimit(parse(zId, p).id);
   }

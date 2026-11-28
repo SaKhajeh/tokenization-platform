@@ -34,7 +34,7 @@ export const VOCAB: Record<string, Vocab> = {
     resubmitted: ["ارسال مجدد", "info"],
     documents_complete: ["مدارک کامل", "info"],
     scoring: ["محاسبه‌ی حد اعتباری", "info"],
-    pending_approval: ["در انتظار تأیید مدیر صندوق", "warning"],
+    pending_approval: ["در انتظار تصمیم صندوق", "warning"],
     sent_back_to_analyst: ["بازگشت به کارشناس", "warning"],
     limit_issued: ["حد اعتباری صادر شد", "success"],
     declined: ["رد شده", "danger"],
@@ -93,8 +93,12 @@ export const VOCAB: Record<string, Vocab> = {
   },
   round: {
     preparing: ["در حال آماده‌سازی", "neutral"],
-    pending_approval: ["در انتظار تأیید", "warning"],
+    pending_approval: ["در انتظار تأیید اعتباری", "warning"],
     sent_back: ["بازگشت برای بازبینی", "warning"],
+    credit_approved: ["تأیید اعتباری؛ نزد کارشناس انطباق", "info"],
+    ceo_review: ["نزد مدیرعامل", "warning"],
+    ceo_accepted: ["پذیرش مدیرعامل؛ آماده‌ی اعلام", "info"],
+    ceo_declined: ["رد مدیرعامل؛ آماده‌ی اعلام", "danger"],
     approved: ["تأیید شد", "success"],
     declined: ["رد شد", "danger"],
   },
@@ -138,7 +142,7 @@ export const ORG_ROLE_FA: Record<string, string> = { org_admin: "مدیر ساز
 export const STAFF_ROLE_FA: Record<string, string> = {
   super_admin: "مدیر سامانه", compliance_officer: "کارشناس انطباق", finance_officer: "کارشناس مالی", tokenisation_officer: "کارشناس توکن‌سازی",
   analyst: "کارشناس اعتباری", external_expert: "کارشناس بیرونی", technical_expert: "کارشناس فنی", committee_member: "عضو کمیته",
-  fund_manager: "مدیر صندوق", credit_manager: "مدیر اعتبارات", auditor: "حسابرس",
+  fund_manager: "مدیر صندوق", credit_manager: "مدیر اعتبارات", ceo: "مدیرعامل صندوق", auditor: "حسابرس",
 };
 export const ACTIVITY_FA: Record<string, string> = {
   production_contracting: "تولیدی - پیمانکاری", production_line: "تولیدی - خط تولید", production_trading: "تولیدی - بازرگانی",
@@ -149,7 +153,7 @@ export const REVIEW_REASON_FA: Record<string, string> = {
   incomplete: "ناقص است", illegible: "خوانا نیست", no_stamp_or_signature: "مهر یا امضا ندارد", outdated_or_invalid: "قدیمی یا نامعتبر است",
   wrong_person: "مربوط به شخص دیگری است", other: "سایر",
 };
-export const STATEMENT_TYPE_FA: Record<string, string> = { audited: "حسابرسی‌شده", tax_return: "اظهارنامه‌ی مالیاتی", internal: "داخلی", balance_sheet: "فقط ترازنامه (آخرین سال)" };
+export const STATEMENT_TYPE_FA: Record<string, string> = { audited: "حسابرسی‌شده", tax_return: "اظهارنامه‌ی مالیاتی", internal: "داخلی", balance_sheet: "فقط ترازنامه (آخرین سال)", trial_balance: "تراز آزمایشی سال جاری" };
 
 /** Financial summary rows (doc 07 §5), grouped as in the fund's form. Values in million rials. */
 export const FIN_GROUPS: [string, [string, string][]][] = [

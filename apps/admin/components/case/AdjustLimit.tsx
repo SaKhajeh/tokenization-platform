@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { scoreCase, toRials, type ActivityType, type ScoringMethod } from "@tp/domain/creditScoring";
-import { scoringYears, toFinancialYear } from "@tp/domain/caseFile";
+import { calculationPeriods, toFinancialYear } from "@tp/domain/caseFile";
 import { useAction, useApi, useQuery, useStepUp, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, COLLATERAL_FA, Card, KV, Select, TextArea, TextInput, dec, latin, toman, tomanShort } from "@tp/ui";
 import type { StaffCase } from "@/lib/case";
@@ -10,7 +10,7 @@ interface Limit { limit: string; valid_to: string; collateral: string; adjusted:
 const three = (x: string) => /^(0(\.\d{1,3})?|1(\.0{1,3})?)$/.test(latin(x));
 
 /** The fund manager raises or lowers an issued limit through Rc/Ra/Re and the collateral class (fund feedback 2026-11-25). */
-export function AdjustLimit({ c, round, reload }: { c: StaffCase; round: { activity_type: string; judgement: { rc: number; ra: number; re: number } } | undefined; reload: () => void }) {
+export function AdjustLimit({ c, round, reload }: { c: StaffCase; round: { activity_type: string; judgement: { rc: number; ra: number; re: number }; result?: { chosen?: "a" | "b" } } | undefined; reload: () => void }) {
   const api = useApi();
   const stepUp = useStepUp();
   const cur = useQuery(`limit:${c.org_id}`, () => api.get<Limit | null>(`/admin/orgs/${c.org_id}/credit-limit`));
@@ -24,8 +24,9 @@ export function AdjustLimit({ c, round, reload }: { c: StaffCase; round: { activ
 
   const preview = useMemo(() => {
     if (!method.data || !round || ![v.rc, v.ra, v.re].every(three)) return null;
-    const latestType = c.financials.find((f) => f.fiscal_year === c.latest_fiscal_year)?.statement_type;
-    const years = scoringYears(c.latest_fiscal_year, latestType).map((y) => c.financials.find((f) => f.fiscal_year === y));
+    // the same periods as the calculation the limit was based on (A: four years; B: trial balance + three years)
+    const per = calculationPeriods(c.latest_fiscal_year, method.data.marginWeights.length);
+    const years = (round.result?.chosen === "b" ? per.b : per.a).map((y) => c.financials.find((f) => f.fiscal_year === y));
     if (years.some((y) => !y?.verified)) return null;
     try {
       const r = scoreCase({ activityType: round.activity_type as ActivityType, years: years.map((y) => toFinancialYear(y!.verified!)) as any, guarantee: { rc: Number(latin(v.rc)), ra: Number(latin(v.ra)), re: Number(latin(v.re)) } }, method.data);

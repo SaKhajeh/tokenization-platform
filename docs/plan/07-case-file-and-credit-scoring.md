@@ -436,7 +436,12 @@ The fund's answer on how the four years are used:
 - The limit is calculated **twice** (D-C35, **not built yet**): (A) on the 4 years of statements; (B) on 3 years of statements plus the trial balance. If A ≥ B, A is the limit. If B > A, the analyst compares the trial balance with the tax returns and other documents and confirms it before B can be used.
 - This replaces the "balance sheet only" option for the latest year (D-C27), which was a stand-in for the trial balance.
 
-Open before building D-C35 (asked 2026-11-26):
+### 13.2 The two calculations and the decision chain (fund answers 2026-11-26, built)
 
-1. The fund's method takes three periods (sales growth over two intervals, margin weights 0.5 / 0.3 / 0.2). Does each calculation now use **four periods** (A: Y0–Y3; B: trial balance + Y0–Y2), and if so with which margin weights and how is growth averaged; or **three periods** (A: Y0–Y2; B: trial balance + Y0–Y1)?
-2. The trial balance covers 3, 6, 9 or 12 months: are its sales and profit **annualised** (× 12 / months) before comparing with full years? Its balance-sheet items are used as they are.
+| # | Decision | Built as |
+|---|---|---|
+| D-C35 | (A) on the 4 years of statements; (B) on the current-year trial balance + the statements of the 3 latest years. Margin weighted 0.4 / 0.3 / 0.2 / 0.1 (latest first); growth averaged over the three year-to-year changes. The trial balance is **not** annualised | Scoring method **version 2** (built in; rounds keep the version they used). Both calculations every time; A is the limit unless B is higher **and** the analyst confirms the trial balance against the tax returns and other documents (with a note). The trial balance is the latest period of B, so its sales and working capital are B's base |
+| D-C36 | The committee sees each period separately, the last one being the trial balance | Per-period table (sales, margin, growth) for A and B, the trial balance highlighted with the months it covers and "not annualised", on every approval screen |
+| D-C37 | After the calculation: compliance officer → CEO with a comment; the CEO confirms the committee meeting was held, sees the guarantee and facility ceilings separately, may edit the numbers, accepts or declines with a comment, back to the compliance officer, who releases the result to the company with explanations; then the company can request services (to be defined) | Round states: preparing → pending_approval (credit approval by the credit manager or fund manager) → credit_approved → ceo_review → ceo_accepted / ceo_declined → approved / declined. New role **ceo** (مدیرعامل صندوق). The CEO's step needs OTP, the meeting confirmation and its date. The limit is issued only at the release; the company sees "awaiting the fund's decision" until then. CEO edits are kept with the round |
+
+Assumptions to confirm: the credit approval (credit manager) stays before the compliance officer; "CEO" is its own role (give both roles to one person if the CEO is the fund manager); in spring the trial balance covers the whole previous year.

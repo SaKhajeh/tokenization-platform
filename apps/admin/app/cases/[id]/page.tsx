@@ -64,7 +64,7 @@ export default function CaseWorkspace() {
           {tab === "form" && <Sections c={c} reload={q.reload} canReview={analyst && c.state === "document_review"} />}
           {tab === "financials" && <Financials c={c} reload={q.reload} canEdit={analyst} />}
           {tab === "visit" && <VisitPanel c={c} reload={q.reload} canPropose={analyst && ["documents_complete", "document_review", "scoring"].includes(c.state)} canReport={has("technical_expert", "analyst")} />}
-          {tab === "scoring" && me && <Scoring c={c} reload={q.reload} meId={me.id} isAnalyst={analyst} isFundManager={has("fund_manager", "credit_manager")} canAdjust={has("fund_manager")} />}
+          {tab === "scoring" && me && <Scoring c={c} reload={q.reload} meId={me.id} isAnalyst={analyst} isFundManager={has("fund_manager", "credit_manager")} canAdjust={has("fund_manager")} isCompliance={has("compliance_officer")} isCeo={has("ceo")} />}
         </>)}
       </div>
     </Shell>

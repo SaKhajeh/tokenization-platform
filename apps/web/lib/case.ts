@@ -31,7 +31,7 @@ export function blockerText(b: Blocker, sectionTitle: (s: string) => string = (s
     case "section_not_saved": return `بخش «${sectionTitle(b.section)}» هنوز ذخیره نشده است.`;
     case "section_incomplete": return `بخش «${sectionTitle(b.section)}» کامل نیست.`;
     case "section_not_fixed": return `بخش «${sectionTitle(b.section)}» باید اصلاح شود.`;
-    case "financials_incomplete": return `صورت مالی سال ${b.fiscal_year} کامل یا تراز نیست.`;
+    case "financials_incomplete": return `ارقام سال ${b.fiscal_year} (صورت مالی، یا تراز آزمایشی برای سال جاری) کامل یا تراز نیست.`;
     case "document_missing": return `مدرک «${b.item} — ${b.slot}» بارگذاری نشده است.`;
     case "document_or_not_available": return `مدرک اختیاری «${b.item} — ${b.slot}»: فایل را بارگذاری کنید یا «ندارم» را بزنید.`;
     case "item_not_fixed": return `مدرک «${b.item} — ${b.slot}» باید اصلاح شود.`;

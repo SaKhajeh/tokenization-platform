@@ -19,7 +19,7 @@ the whole credit path on a fresh database:
 # 1. API in development mode on an in-memory database, logging OTPs to a file the scripts read
 cd apps/api
 APP_ENV=development DATABASE_URL=pglite: \
-DEV_STAFF="09350000001:analyst,compliance_officer,finance_officer;09350000002:fund_manager,technical_expert;09350000004:credit_manager" \
+DEV_STAFF="09350000001:analyst,compliance_officer,finance_officer;09350000002:fund_manager,technical_expert;09350000004:credit_manager;09350000005:ceo" \
 npm run dev > /tmp/tp-api.log 2>&1 &
 
 # 2. Both apps (build once, then start)

@@ -39,7 +39,7 @@ used end to end without Postgres, MinIO or Jibit:
 ```bash
 npm install
 cd apps/api && APP_ENV=development DATABASE_URL=pglite: \
-  DEV_STAFF="09350000001:analyst,compliance_officer,finance_officer;09350000002:fund_manager,technical_expert" \
+  DEV_STAFF="09350000001:analyst,compliance_officer,finance_officer;09350000002:fund_manager,technical_expert;09350000004:credit_manager;09350000005:ceo" \
   npm run dev                       # :3000 — OTP codes appear in this log as [mock-sms]
 npm run dev -w @tp/web              # :3001 applicant / investor app
 npm run dev -w @tp/admin            # :3002 staff app (log in with a DEV_STAFF mobile)

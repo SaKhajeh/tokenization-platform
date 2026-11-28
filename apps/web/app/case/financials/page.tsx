@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FINANCIAL_FIELDS, statement } from "@tp/domain/creditScoring";
-import { financialYears, toFinancialYear } from "@tp/domain/caseFile";
+import { financialPeriods, toFinancialYear, trialBalancePeriod } from "@tp/domain/caseFile";
 import { useAction, useApi, useQuery, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, Card, FIN_GROUPS, FIN_TOTALS, STATEMENT_TYPE_FA, Tabs, Toast, fa, latin, millions } from "@tp/ui";
 import { Shell } from "@/components/Shell";
@@ -13,13 +13,16 @@ type Year = { statement_type: string; figures: Record<string, string> };
 const empty = (): Year => ({ statement_type: "", figures: Object.fromEntries(FINANCIAL_FIELDS.map((k) => [k, ""])) });
 const INT = /^-?(0|[1-9]\d{0,14})$/;
 
-/** Doc 07 §5: three fiscal years in whole million rials; assets must equal liabilities + equity. */
+/** Doc 07 §5 and §13.2: the current-year trial balance and four years of statements, in whole million rials; each must balance. */
 export default function FinancialsPage() {
   const api = useApi();
   const { org } = useMe();
   const cs = useQuery(org ? `case:${org.id}` : null, () => api.get<Case>("/case"));
   const c = cs.data;
-  const years = c ? financialYears(c.latest_fiscal_year) : [];
+  const years = c ? financialPeriods(c.latest_fiscal_year) : [];
+  const tbYear = c ? c.latest_fiscal_year + 1 : 0;
+  const tb = trialBalancePeriod(new Date(Date.now() + 3.5 * 3600_000).toISOString().slice(0, 10));
+  const head = (y: number) => (y === tbYear ? "تراز آزمایشی" : `سال ${fa(y)}`);
   const [vals, setVals] = useState<Record<number, Year>>({});
   const [dirty, setDirty] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
@@ -28,7 +31,7 @@ export default function FinancialsPage() {
   useEffect(() => {
     if (!c) return;
     const v: Record<number, Year> = {};
-    for (const y of financialYears(c.latest_fiscal_year)) {
+    for (const y of financialPeriods(c.latest_fiscal_year)) {
       const row = c.financials.find((f) => f.fiscal_year === y);
       v[y] = row?.declared ? { statement_type: row.statement_type ?? "", figures: { ...empty().figures, ...row.declared } } : empty();
     }
@@ -41,7 +44,7 @@ export default function FinancialsPage() {
       const v = vals[y];
       // blanks are saved as 0 so a draft can be kept; the submission check needs every year balanced
       const figures = Object.fromEntries(FINANCIAL_FIELDS.map((k) => [k, INT.test(v.figures[k]) ? v.figures[k] : "0"]));
-      await api.put(`/case/financials/${y}`, { statement_type: v.statement_type || "audited", figures });
+      await api.put(`/case/financials/${y}`, { statement_type: y === tbYear ? "trial_balance" : v.statement_type || "audited", figures });
     }
     cs.reload();
     setToast("ذخیره شد");
@@ -62,24 +65,24 @@ export default function FinancialsPage() {
       <div className="stack">
         <Link href="/case">← بازگشت به پرونده</Link>
         <p className="t-muted">ارقام <strong>چهار سال اخیر</strong> را به <strong>میلیون ریال</strong> و بدون اعشار، مطابق صورت مالی حسابرسی‌شده یا اظهارنامه وارد کنید. زیان را با علامت منفی بنویسید.</p>
-        <p className="t-small t-muted">اگر صورت مالی آخرین سال هنوز آماده نیست، نوع آن را «فقط ترازنامه» بگذارید و ارقام ترازنامه را وارد کنید؛ در این حالت محاسبه‌ی حد با سه سال پیش از آن انجام می‌شود.</p>
+        <p className="t-small t-muted">ستون اول، ارقام تراز آزمایشی سال جاری ({fa(tb.label)}) است؛ ارقام همان دوره را بدون تبدیل به سالانه وارد کنید. صندوق حد را یک بار با چهار سال صورت مالی و یک بار با تراز آزمایشی و سه سال اخیر محاسبه می‌کند.</p>
         <ErrorBanner error={cs.error} />
         {c && (
           <Card>
             <div className="phone-only" style={{ marginBottom: 8 }}>
-              <Tabs tabs={years.map((y, i) => [String(i), `سال ${fa(y)}`] as [string, string])} value={String(yi)} onChange={(v) => setYi(Number(v))} />
+              <Tabs tabs={years.map((y, i) => [String(i), head(y)] as [string, string])} value={String(yi)} onChange={(v) => setYi(Number(v))} />
             </div>
             <div className="table-wrap">
               <table className="table fin-table">
                 <thead>
-                  <tr><th>قلم</th>{years.map((y, i) => <th key={y} className={i !== yi ? "yr-other" : undefined}>سال {fa(y)}</th>)}</tr>
+                  <tr><th>قلم</th>{years.map((y, i) => <th key={y} className={i !== yi ? "yr-other" : undefined}>{head(y)}{y === tbYear && <div className="t-small t-muted" style={{ fontWeight: 400 }}>{fa(tb.label)}</div>}</th>)}</tr>
                   <tr><td>نوع صورت مالی</td>{years.map((y, i) => (
                     <td key={y} className={i !== yi ? "yr-other" : undefined}>
-                      <select className="select" value={vals[y]?.statement_type ?? ""} disabled={!editable} aria-label={`نوع صورت مالی ${y}`}
+                      {y === tbYear ? <span className="t-small">تراز آزمایشی شش‌ستونی</span> : <select className="select" value={vals[y]?.statement_type ?? ""} disabled={!editable} aria-label={`نوع صورت مالی ${y}`}
                         onChange={(e) => { setVals((v) => ({ ...v, [y]: { ...v[y], statement_type: e.target.value } })); setDirty((d) => new Set(d).add(y)); }}>
                         <option value="" disabled>انتخاب</option>
-                        {Object.entries(STATEMENT_TYPE_FA).filter(([k]) => k !== "balance_sheet" || y === c.latest_fiscal_year).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-                      </select>
+                        {Object.entries(STATEMENT_TYPE_FA).filter(([k]) => k !== "balance_sheet" && k !== "trial_balance").map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                      </select>}
                     </td>
                   ))}</tr>
                 </thead>

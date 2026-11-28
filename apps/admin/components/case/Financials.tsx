@@ -3,12 +3,12 @@ import { Fragment, useState } from "react";
 import { useAction, useApi, ErrorBanner } from "@tp/client/react";
 import { Banner, Button, Card, FIN_GROUPS, FIN_TOTALS, STATEMENT_TYPE_FA, TextInput, fa, jdatetime, latin, millions } from "@tp/ui";
 import type { StaffCase } from "@/lib/case";
-import { financialYears } from "@tp/domain/caseFile";
+import { financialPeriods } from "@tp/domain/caseFile";
 
 /** S-18: declared vs verified figures per year; each change needs a reason and is kept; lock before scoring (doc 07 §5.2). */
 export function Financials({ c, reload, canEdit }: { c: StaffCase; reload: () => void; canEdit: boolean }) {
   const api = useApi();
-  const years = financialYears(c.latest_fiscal_year);
+  const years = financialPeriods(c.latest_fiscal_year); // the trial balance first, then four years of statements
   const fin = (y: number) => c.financials.find((f) => f.fiscal_year === y);
   const [edit, setEdit] = useState<{ y: number; k: string; label: string; value: string; reason: string } | null>(null);
   const locked = !!c.financials_locked_at;
@@ -38,7 +38,7 @@ export function Financials({ c, reload, canEdit }: { c: StaffCase; reload: () =>
       <Card>
         <div className="table-wrap"><table className="table fin">
           <thead>
-            <tr><th>قلم</th>{years.map((y) => <th key={y} colSpan={2}>سال {fa(y)} — {STATEMENT_TYPE_FA[fin(y)?.statement_type ?? ""] ?? "—"}</th>)}</tr>
+            <tr><th>قلم</th>{years.map((y) => <th key={y} colSpan={2}>{y === c.latest_fiscal_year + 1 ? <>تراز آزمایشی {fa(y)}{(fin(y) as any)?.through_month ? ` (${fa((fin(y) as any).through_month)} ماه)` : ""}</> : <>سال {fa(y)} — {STATEMENT_TYPE_FA[fin(y)?.statement_type ?? ""] ?? "—"}</>}</th>)}</tr>
             <tr><th />{years.map((y) => <Fragment key={y}><th>اظهار</th><th>تأییدشده</th></Fragment>)}</tr>
           </thead>
           <tbody>

@@ -1,7 +1,7 @@
 import { ADMIN, WEB, browser, page, login, shot, stepUp, DIR } from "./lib.mjs";
 import { readFileSync } from "node:fs";
 const { M } = JSON.parse(readFileSync(`${DIR}/run.json`, "utf8"));
-const AN = "09350000001", FM = "09350000002";
+const AN = "09350000001", FM = "09350000002", CEO = "09350000005"; // AN is also the compliance officer
 const b = await browser();
 const an = await page(b, { width: 1440, height: 900 });
 await login(an, ADMIN, AN);
@@ -86,17 +86,45 @@ await an.getByLabel("دلیل RA").fill("خط تولید فعال و تیم فن
 await an.getByLabel("دلیل RE").fill("بازار فولاد پایدار، ریسک ارزی متوسط");
 await shot(an, "33-admin-scoring-live");
 await an.getByRole("button", { name: "ثبت دور محاسبه" }).click();
-await an.getByLabel("خلاصه برای مدیر صندوق").fill("شرکت تولیدی با رشد فروش مناسب؛ پیشنهاد حد با چک و سفته.");
-await an.getByRole("button", { name: "ارسال برای تأیید مدیر صندوق" }).click();
+await an.getByLabel("خلاصه برای کمیته و مدیر اعتبارات").fill("شرکت تولیدی با رشد فروش مناسب؛ پیشنهاد حد با چک و سفته.");
+await an.getByRole("button", { name: "ارسال برای تأیید اعتباری" }).click();
 await an.locator(".chip", { hasText: "در انتظار تأیید" }).first().waitFor();
 
-// fund manager approves with OTP
+// fund manager gives the credit approval with OTP (this no longer issues the limit)
 await fm.reload();
 await fm.getByRole("tab", { name: "محاسبه و تأیید حد" }).click();
-await fm.getByLabel("یادداشت برای متقاضی (اختیاری)").fill("برای افزایش حد، وثیقه‌ی ملکی پیشنهاد دهید.");
-await shot(fm, "34-admin-approval");
-await stepUp(fm, FM, () => fm.getByRole("button", { name: "تأیید و صدور حد" }).click());
-await fm.locator(".chip", { hasText: "حد اعتباری صادر شد" }).first().waitFor({ timeout: 10000 });
+await fm.getByText("محاسبه‌ی ب").first().waitFor();
+await shot(fm, "34-admin-credit-approval");
+await stepUp(fm, FM, () => fm.getByRole("button", { name: "تأیید اعتباری" }).click());
+await fm.getByText("ارسال نتیجه برای مدیرعامل").waitFor({ timeout: 10000 });
+
+// compliance officer sends it to the CEO with a comment
+await an.reload();
+await an.getByRole("tab", { name: "محاسبه و تأیید حد" }).click();
+await an.getByLabel("نظر کارشناس انطباق برای مدیرعامل").fill("مدارک و ارقام کامل است؛ کمیته‌ی اعتباری حد را بررسی کرد.");
+await an.getByRole("button", { name: "ارسال برای مدیرعامل" }).click();
+await an.getByText("منتظر تصمیم مدیرعامل").waitFor();
+
+// CEO: confirms the committee meeting, sees guarantee and facility ceilings, accepts with a comment (OTP)
+const ceo = await page(b, { width: 1440, height: 900 });
+await login(ceo, ADMIN, CEO);
+await ceo.goto(an.url());
+await ceo.getByRole("tab", { name: "محاسبه و تأیید حد" }).click();
+await ceo.getByText("جلسه‌ی کمیته برای تعیین سقف این پرونده برگزار شده است.").click();
+const td = new Date(Date.now() + 3.5 * 3600e3);
+const jt = toJalaali(td.getUTCFullYear(), td.getUTCMonth() + 1, td.getUTCDate());
+await ceo.getByLabel("تاریخ جلسه‌ی کمیته").fill(`${jt.jy}/${String(jt.jm).padStart(2, "0")}/${String(jt.jd).padStart(2, "0")}`);
+await ceo.getByLabel("نظر مدیرعامل").fill("جلسه‌ی کمیته برگزار شد؛ حد پیشنهادی تأیید می‌شود.");
+await shot(ceo, "36-ceo-decision");
+await stepUp(ceo, CEO, () => ceo.getByRole("button", { name: "پذیرش", exact: true }).click());
+await ceo.getByText("منتظر اعلام توسط کارشناس انطباق").waitFor({ timeout: 10000 });
+
+// compliance officer releases the result to the company with an explanation
+await an.reload();
+await an.getByRole("tab", { name: "محاسبه و تأیید حد" }).click();
+await an.getByLabel("توضیح برای شرکت (درباره‌ی ارقام و شرایط)").fill("حد اعتباری با چک و سفته تعیین شد؛ برای افزایش، وثیقه‌ی ملکی پیشنهاد دهید.");
+await an.getByRole("button", { name: "اعلام به شرکت" }).click();
+await an.locator(".chip", { hasText: "حد اعتباری صادر شد" }).first().waitFor({ timeout: 10000 });
 
 // applicant sees the limit
 await ap.goto(`${WEB}/limit`);
